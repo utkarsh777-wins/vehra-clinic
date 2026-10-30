@@ -1,0 +1,196 @@
+{
+  "address": {
+    "line1": "Vehra Dental & Family Clinic",
+    "line2": "First floor, 14 Banga Road",
+    "city": "Phagwara",
+    "state": "Punjab",
+    "postalCode": "144401",
+    "country": "India"
+  },
+  "map": {
+    "label": "Schematic map of the Banga Road area. Not to scale. The clinic pin is fictional.",
+    "lat": 31.224,
+    "lng": 75.7708,
+    "bbox": [75.735, 31.205, 75.805, 31.245]
+  },
+  "contact": {
+    "phoneDisplay": "+91 00000 00000",
+    "whatsappNumber": "910000000000",
+    "email": "hello@vehra-demo.example"
+  },
+  "languages": ["English", "Hindi", "Punjabi"],
+  "hours": {
+    "timezone": "Asia/Kolkata",
+    "closedWeekdays": [0],
+    "slots": [
+      { "start": "09:30", "end": "13:30" },
+      { "start": "16:30", "end": "20:00" }
+    ],
+    "saturdaySlots": [
+      { "start": "09:30", "end": "13:30" },
+      { "start": "16:30", "end": "19:00" }
+    ],
+    "lines": [
+      "Monday to Friday, 9:30 am–1:30 pm and 4:30 pm–8:00 pm.",
+      "Saturday, 9:30 am–1:30 pm and 4:30 pm–7:00 pm.",
+      "Sunday: closed."
+    ]
+  },
+  "services": [
+    {
+      "name": "Check-ups & cleaning",
+      "summary": "A careful look, a gentle clean, and a plain-language note on anything to watch."
+    },
+    {
+      "name": "Fillings & root canal",
+      "summary": "Treatment for cavities and tooth pain, with options and costs discussed first."
+    },
+    {
+      "name": "Braces & aligners",
+      "summary": "Consultation and planning for crooked or crowded teeth, for teens and adults."
+    },
+    {
+      "name": "Children's dentistry",
+      "summary": "Calm first visits, sealants and habits that make the next visit easier."
+    },
+    {
+      "name": "General physician OPD",
+      "summary": "Fever, BP, sugar, seasonal illness and routine family check-ups."
+    },
+    {
+      "name": "Dentures & implants",
+      "summary": "Replacing missing teeth, starting with an honest consultation on what suits you."
+    }
+  ],
+  "doctors": [
+    {
+      "name": "Dr. Simran Kaur",
+      "qualification": "BDS",
+      "role": "Dental surgeon",
+      "days": "Check-ups, fillings, root canal and children's dentistry",
+      "fictional": true
+    },
+    {
+      "name": "Dr. Harjot Singh",
+      "qualification": "MBBS",
+      "role": "General physician",
+      "days": "Fever, BP and sugar care, and routine family check-ups",
+      "fictional": true
+    }
+  ],
+  "feesNote": "[Placeholder: consultation and treatment fees go here]",
+  "why": [
+    {
+      "title": "Costs explained before treatment",
+      "body": "You'll hear the options and an estimate first, and you decide."
+    },
+    {
+      "title": "Sterilised instruments, every time",
+      "body": "Sealed kits opened in front of you, for every patient."
+    },
+    {
+      "title": "Unhurried appointments",
+      "body": "Fewer bookings per hour, so there's time for your questions."
+    },
+    {
+      "title": "Your language, your pace",
+      "body": "Punjabi, Hindi or English, at the desk, in the chair and in chat."
+    }
+  ],
+  "placeholders": {
+    "reviews": "[Placeholder: patient reviews go here]",
+    "stats": "[Placeholder: clinic facts and figures go here]"
+  },
+  "faqs": [
+    {
+      "id": "hours",
+      "question": "Are you open today?",
+      "answer": "Monday to Friday, 9:30 am–1:30 pm and 4:30 pm–8:00 pm. Saturday, 9:30 am–1:30 pm and 4:30 pm–7:00 pm. Sunday: closed. Walk-ins are welcome in the morning session.",
+      "keywords": ["hour", "hours", "timing", "timings", "open", "opening", "today", "close", "closing", "sunday", "closed", "saturday", "weekday"]
+    },
+    {
+      "id": "walk-in",
+      "question": "Do I need an appointment, or can I walk in?",
+      "answer": "Walk-ins are welcome in the morning session. Booking ahead means a shorter wait, especially in the evening.",
+      "keywords": ["walk", "walk in", "walk-in", "without an appointment"]
+    },
+    {
+      "id": "address",
+      "question": "Where is the clinic?",
+      "answer": "First floor, 14 Banga Road, Phagwara, Punjab 144401. The address is fictional. The map is a schematic of the area, not a real clinic.",
+      "keywords": ["address", "where", "location", "located", "direction", "directions", "banga", "phagwara", "map"]
+    },
+    {
+      "id": "parking",
+      "question": "Where do I park?",
+      "answer": "Street parking nearby. The clinic is on the first floor, with stairs and a lift.",
+      "keywords": ["park", "parking", "car", "do i park", "where do i park"]
+    },
+    {
+      "id": "services",
+      "question": "Which services do you offer?",
+      "answer": "Check-ups and cleaning, fillings and root canal, braces and aligners, children's dentistry, general physician OPD, and dentures and implants. This is a demo list, not medical advice.",
+      "keywords": ["service", "services", "dental", "cleaning", "filling", "fillings", "root", "canal", "root canal", "braces", "aligner", "aligners", "denture", "dentures", "implant", "implants", "physician", "opd", "treatment"]
+    },
+    {
+      "id": "children",
+      "question": "Do you see children?",
+      "answer": "Yes. First visits for children are kept short and gentle, with a parent in the room.",
+      "keywords": ["child", "children", "kids", "kid", "baby"]
+    },
+    {
+      "id": "fees",
+      "question": "How much is a cleaning?",
+      "answer": "The doctor explains your options and gives an estimate before any treatment begins. [Placeholder: consultation and treatment fees go here]. This demo does not publish prices.",
+      "keywords": ["fee", "fees", "cost", "costs", "price", "prices", "charge", "charges", "kitna", "payment", "pay", "how much", "cleaning cost"]
+    },
+    {
+      "id": "bring",
+      "question": "What should I bring to my first visit?",
+      "answer": "Any previous prescriptions, X-rays or reports, and a list of medicines you take.",
+      "keywords": ["bring", "first visit", "prescription", "x-ray", "xray", "report"]
+    },
+    {
+      "id": "payment",
+      "question": "Which payment methods are accepted?",
+      "answer": "Cash, UPI and cards. [Placeholder: payment methods are a sample, not a real desk policy.]",
+      "keywords": ["upi", "card", "cards", "cash", "payment method", "payment methods"]
+    },
+    {
+      "id": "doctors",
+      "question": "Who are the doctors?",
+      "answer": "Dr. Simran Kaur (BDS, dental surgeon) and Dr. Harjot Singh (MBBS, general physician). Both names are fictional placeholders.",
+      "keywords": ["doctor", "doctors", "dentist", "clinician", "simran", "harjot", "kaur", "singh"]
+    },
+    {
+      "id": "languages",
+      "question": "Which languages do you speak?",
+      "answer": "Punjabi, Hindi and English, at the desk, in the chair and in chat.",
+      "keywords": ["language", "languages", "hindi", "punjabi", "english", "speak"]
+    },
+    {
+      "id": "contact",
+      "question": "How do I contact the clinic?",
+      "answer": "Call +91 00000 00000 (a placeholder), use the WhatsApp button, or send an appointment request in the assistant. The email is hello@vehra-demo.example.",
+      "keywords": ["phone", "call", "whatsapp", "email", "contact", "reach"]
+    },
+    {
+      "id": "sunday",
+      "question": "What if I have a dental emergency on Sunday?",
+      "answer": "Call the clinic number. If the doctor is unavailable, the recording gives the nearest emergency option. Sunday clinic hours are closed.",
+      "keywords": ["emergency", "sunday emergency"]
+    },
+    {
+      "id": "demo",
+      "question": "Is this a real clinic?",
+      "answer": "No. This is a demo of a fictional business. Vehra Dental & Family Clinic does not provide medical care.",
+      "keywords": ["real", "fictional", "demo", "fake", "actual"]
+    },
+    {
+      "id": "booking-how",
+      "question": "How do I book an appointment?",
+      "answer": "Open the assistant and ask to book. It takes your name, a 10-digit Indian mobile number, a preferred day and morning or evening, then repeats the details. The request is received, not confirmed, until the desk calls you.",
+      "keywords": ["how to book", "booking help", "book", "appointment"]
+    }
+  ]
+}
