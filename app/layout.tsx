@@ -3,7 +3,7 @@ import localFont from "next/font/local"
 import Script from "next/script"
 
 import { ChatWidget } from "@/components/chat-widget"
-import { DemoBar } from "@/components/demo-bar"
+import { SampleBar } from "@/components/sample-bar"
 import { LocaleProvider } from "@/components/locale"
 import { brand } from "@/theme/brand"
 
@@ -75,10 +75,25 @@ const mahee = localFont({
   display: "swap",
 })
 
+const title = `${brand.name}, Phagwara`
+const description = brand.description
+
 export const metadata: Metadata = {
-  title: `${brand.name}, Phagwara (Demo, fictional business)`,
-  description: brand.description,
+  title,
+  description,
   robots: { index: false, follow: false },
+  openGraph: {
+    title,
+    description,
+    siteName: brand.name,
+    locale: "en_IN",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description,
+  },
 }
 
 const themeBoot = `(function(){var q=new URLSearchParams(location.search);var t=q.get("theme");var root=document.documentElement;if(t==="dark"||t==="light")root.dataset.theme=t;else root.dataset.theme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";if(!q.has("shot"))root.classList.add("js");})();`
@@ -98,7 +113,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
         <LocaleProvider>
-          <DemoBar />
+          <SampleBar />
           {children}
           <ChatWidget />
         </LocaleProvider>

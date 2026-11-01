@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { GET } from "@/app/api/bookings/route"
 import { POST } from "@/app/api/chat/route"
 import type { Session } from "@/lib/booking"
+import { resetGuards } from "@/lib/guard"
 
 const NOW = "2026-10-29T04:30:00.000Z"
 
@@ -16,7 +17,8 @@ beforeEach(async () => {
   directory = await mkdtemp(path.join(os.tmpdir(), "sukoon-"))
   process.env.BOOKINGS_STORE_PATH = path.join(directory, "bookings.json")
   process.env.BOOKINGS_FALLBACK_PATH = path.join(directory, "fallback.json")
-  process.env.BOOKINGS_VIEW_SECRET = "test-secret"
+  process.env.BOOKINGS_VIEW_SECRET = "test-secret-value1"
+  resetGuards()
   process.env.LLM_PROVIDER = "none"
   delete process.env.LLM_API_KEY
   delete process.env.LLM_MODEL
@@ -35,7 +37,7 @@ function chat(body: unknown, headers: Record<string, string> = {}) {
   return POST(
     new Request("http://localhost/api/chat", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-demo-now": NOW, ...headers },
+      headers: { "content-type": "application/json", "x-clock": NOW, ...headers },
       body: JSON.stringify(body),
     }),
   )
@@ -45,12 +47,13 @@ async function bookThroughChat() {
   let response = await chat({ message: "", intent: "start_booking" })
   let payload = (await response.json()) as {
     session: Session
+    sessionToken?: string
     reply: string
     booking: { id: string; webhook: string }
   }
   const steps = ["Ada Kaur", "9876543210", "2 Nov 2026 10:30 am", "Tooth check-up", "yes"]
   for (const message of steps) {
-    response = await chat({ message, session: payload.session })
+    response = await chat({ message, session: payload.session, sessionToken: payload.sessionToken })
     payload = await response.json()
   }
   return { response, payload }
@@ -78,7 +81,7 @@ describe("POST /api/chat", () => {
     const payload = await response.json()
     expect(payload.source).toBe("rules")
     expect(payload.reply).toContain("Banga Road")
-    expect(payload.demoLabel).toBe("Demo, fictional business")
+    expect(payload.sampleLabel).toBe("Sample site")
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
@@ -86,7 +89,7 @@ describe("POST /api/chat", () => {
     const { response, payload } = await bookThroughChat()
     expect(response.status).toBe(200)
     expect(payload.reply).toMatch(/Request received, not yet confirmed/)
-    expect(payload.reply).toMatch(/demo, not sent/)
+    expect(payload.reply).toMatch(/not sent yet/)
     expect(payload.booking.webhook).toBe("skipped")
     expect(payload.booking.id).toMatch(/^VH-/)
 
@@ -99,15 +102,19 @@ describe("POST /api/chat", () => {
       time: "10:30",
       reason: "Tooth check-up",
       source: "chat",
-      demo: true,
+      sample: true,
+      language: "en",
+      status: "active",
     })
+    expect(stored[0].key).toMatch(/^[0-9a-f-]{36}$/)
+    expect(stored[0].id).toMatch(/^VH-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/)
 
     const hidden = await GET(new Request("http://localhost/api/bookings"))
     expect(hidden.status).toBe(401)
 
     const shown = await GET(
       new Request("http://localhost/api/bookings", {
-        headers: { "x-bookings-secret": "test-secret" },
+        headers: { "x-bookings-secret": "test-secret-value1" },
       }),
     )
     expect(shown.status).toBe(200)
@@ -131,7 +138,7 @@ describe("POST /api/chat", () => {
     expect(payload.reply).toMatch(/spreadsheet webhook/)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(JSON.parse(String(init.body))).toMatchObject({ phone: "9876543210", demo: true })
+    expect(JSON.parse(String(init.body))).toMatchObject({ phone: "9876543210", sample: true, language: "en" })
 
     const stored = JSON.parse(await readFile(process.env.BOOKINGS_STORE_PATH!, "utf8"))
     expect(stored).toHaveLength(1)
@@ -142,7 +149,7 @@ describe("POST /api/chat", () => {
     process.env.LLM_API_KEY = "test-key"
     process.env.LLM_MODEL = "test-model"
     const fetchMock = vi.fn().mockResolvedValue(
-      Response.json({ choices: [{ message: { content: "The demo notes place the clinic in Phagwara." } }] }),
+      Response.json({ choices: [{ message: { content: "The notes place the clinic in Phagwara." } }] }),
     )
     vi.stubGlobal("fetch", fetchMock)
 
@@ -152,6 +159,8 @@ describe("POST /api/chat", () => {
     expect(answeredBody.reply).toContain("Phagwara")
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(String(init.body)).toContain("Banga Road")
+    expect(String(init.body)).toContain("112")
+    expect(String(init.body).toLowerCase()).not.toContain("demo")
     expect(String((init.headers as Record<string, string>).authorization)).toBe("Bearer test-key")
 
     fetchMock.mockRejectedValueOnce(new Error("offline"))

@@ -1,8 +1,8 @@
 # Vehra Dental & Family Clinic
 
-A portfolio demo of a **fictional** dental and family clinic in Phagwara, Punjab. The site is a mobile-first Next.js app with a floating assistant that answers from `content/clinic.json` and collects appointment requests.
+A portfolio sample of a **fictional** dental and family clinic in Phagwara, Punjab. The site is a mobile-first Next.js app with a floating assistant that answers from `content/clinic.json` and collects appointment requests.
 
-**Demo, fictional business.** Nothing here is a real clinic, and a request is not a confirmed appointment.
+**Sample site.** Nothing here is a real clinic, and a request is not a confirmed appointment.
 
 ## Run locally
 
@@ -25,7 +25,7 @@ npm run build
 
 Public name, colours, and the type scale live in [`theme/brand.ts`](theme/brand.ts) and the tokens at the top of [`app/globals.css`](app/globals.css). Fonts are self-hosted with `next/font`: Fraunces, Instrument Sans, Mukta (Hindi), and Mukta Mahee (Punjabi).
 
-Hindi and Punjabi UI copy is in [`content/messages.ts`](content/messages.ts). **It needs a check by a native speaker** before anyone treats it as finished translation. The English copy follows the design handoff.
+Hindi and Punjabi UI copy is in [`content/messages.ts`](content/messages.ts). It uses everyday wording and still needs a native-speaker check before anyone treats it as finished translation. The English copy follows the design handoff.
 
 Preview flags, same as the static mockup:
 
@@ -64,7 +64,9 @@ Set `LLM_MODEL` to override the default. Gemini uses the `x-goog-api-key` header
 | `LLM_MODEL` | no | Overrides the provider default |
 | `BOOKING_WEBHOOK_URL` | no | Opt-in POST of each saved request. Off when unset |
 | `BOOKINGS_STORE_PATH` | no | JSON file path. See storage below |
-| `BOOKINGS_VIEW_SECRET` | to open the log | Shared secret for `GET /api/bookings` and `/bookings` |
+| `BOOKINGS_VIEW_SECRET` | to open the log | Shared secret for `GET /api/bookings` and `/bookings`. Unset, `change-me`, and values under 16 characters are refused |
+| `BOOKING_SESSION_SECRET` | no | HMAC key for the booking session. Falls back to a long view secret, then a process-local key |
+| `BOOKING_WEBHOOK_SECRET` | no | When set, webhook posts include `x-vehra-signature: sha256=<hmac>` |
 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | no | Digits for the `wa.me` link. Default `910000000000` |
 
 ## Where requests are stored
@@ -72,7 +74,7 @@ Set `LLM_MODEL` to override the default. Gemini uses the `x-goog-api-key` header
 By default a request is appended to a JSON file and sent nowhere.
 
 - On a normal machine the file is `data/bookings.json` (gitignored).
-- On Vercel the default is `/tmp/vehra-bookings.json`. That disk is ephemeral: the file disappears when the instance shuts down, and another instance cannot see it.
+- On Vercel the default is `/tmp/vehra-bookings.json`. That disk is ephemeral and per-instance: the file disappears when the instance shuts down, and another instance cannot see it. **A webhook is required in production** if the desk needs a durable copy.
 - If the primary path cannot be created, the server tries `/tmp/vehra-bookings.json`.
 
 Override the path with `BOOKINGS_STORE_PATH`. A durable copy needs `BOOKING_WEBHOOK_URL`.
@@ -100,11 +102,11 @@ function doPost(e) {
     || SpreadsheetApp.getActiveSpreadsheet().insertSheet("Bookings");
   const data = JSON.parse(e.postData.contents);
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["id", "name", "phone", "date", "time", "reason", "createdAt", "source", "demo"]);
+    sheet.appendRow(["id", "name", "phone", "date", "time", "reason", "createdAt", "source", "language", "status"]);
   }
   sheet.appendRow([
     data.id, data.name, data.phone, data.date, data.time,
-    data.reason, data.createdAt, data.source, data.demo
+    data.reason, data.createdAt, data.source, data.language, data.status
   ]);
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true }))
@@ -112,7 +114,7 @@ function doPost(e) {
 }
 ```
 
-The site still keeps the local JSON copy. If the webhook responds with an error, the request remains in the demo log and the assistant says the sheet did not accept it.
+The site still keeps the local JSON copy. If the webhook responds with an error, the request remains in the local log and the assistant says the sheet did not accept it. Set `BOOKING_WEBHOOK_SECRET` so the script can check `x-vehra-signature`.
 
 ## Deploy on Vercel
 
@@ -120,7 +122,7 @@ This repo is ready for a free Vercel project. No account was created from here.
 
 1. Push the repository to GitHub.
 2. In Vercel, import the project. Framework preset: Next.js.
-3. Add the environment variables from `.env.example`. Use a real `BOOKINGS_VIEW_SECRET`. Leave `BOOKING_WEBHOOK_URL` empty unless a sheet is ready.
+3. Add the environment variables from `.env.example`. Use a real `BOOKINGS_VIEW_SECRET` of at least 16 characters. Leave `BOOKING_WEBHOOK_URL` empty unless a sheet is ready. On Vercel the webhook is required if bookings must survive a restart.
 4. Deploy. `npm run build` is the production build.
 5. Expect the JSON log on Vercel to be ephemeral unless the webhook is set.
 
@@ -130,4 +132,4 @@ This repo is ready for a free Vercel project. No account was created from here.
 - The on-disk log is not shared across serverless instances and does not survive a restart on Vercel.
 - Hindi and Punjabi strings are a draft for a native speaker to correct.
 - The map is a schematic drawing, not a live map of a real clinic.
-- The assistant will not give medical advice. Emergency wording points at the placeholder phone number.
+- The assistant will not give medical advice. Emergency messages tell the person to call 112, or 108 for an ambulance, and do not offer the placeholder clinic number.

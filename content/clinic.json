@@ -16,7 +16,7 @@
   "contact": {
     "phoneDisplay": "+91 00000 00000",
     "whatsappNumber": "910000000000",
-    "email": "hello@vehra-demo.example"
+    "email": "hello@vehra.example"
   },
   "languages": ["English", "Hindi", "Punjabi"],
   "hours": {
@@ -64,15 +64,15 @@
   ],
   "doctors": [
     {
-      "name": "Dr. Simran Kaur",
-      "qualification": "BDS",
-      "role": "Dental surgeon",
+      "name": "Dentist (placeholder)",
+      "qualification": "Placeholder",
+      "role": "Dentist",
       "days": "Check-ups, fillings, root canal and children's dentistry",
       "fictional": true
     },
     {
-      "name": "Dr. Harjot Singh",
-      "qualification": "MBBS",
+      "name": "General physician (placeholder)",
+      "qualification": "Placeholder",
       "role": "General physician",
       "days": "Fever, BP and sugar care, and routine family check-ups",
       "fictional": true
@@ -85,12 +85,12 @@
       "body": "You'll hear the options and an estimate first, and you decide."
     },
     {
-      "title": "Sterilised instruments, every time",
-      "body": "Sealed kits opened in front of you, for every patient."
+      "title": "Instrument care",
+      "body": "[Placeholder] How instruments are prepared is not listed here."
     },
     {
-      "title": "Unhurried appointments",
-      "body": "Fewer bookings per hour, so there's time for your questions."
+      "title": "Time for questions",
+      "body": "Visits leave room for your questions."
     },
     {
       "title": "Your language, your pace",
@@ -106,7 +106,7 @@
       "id": "hours",
       "question": "Are you open today?",
       "answer": "Monday to Friday, 9:30 am–1:30 pm and 4:30 pm–8:00 pm. Saturday, 9:30 am–1:30 pm and 4:30 pm–7:00 pm. Sunday: closed. Walk-ins are welcome in the morning session.",
-      "keywords": ["hour", "hours", "timing", "timings", "open", "opening", "today", "close", "closing", "sunday", "closed", "saturday", "weekday"]
+      "keywords": ["hour", "hours", "timing", "timings", "open", "opening", "today", "close", "closing", "sunday", "closed", "saturday", "weekday", "khulta", "khulte", "kab", "samay"]
     },
     {
       "id": "walk-in",
@@ -118,7 +118,7 @@
       "id": "address",
       "question": "Where is the clinic?",
       "answer": "First floor, 14 Banga Road, Phagwara, Punjab 144401. The address is fictional. The map is a schematic of the area, not a real clinic.",
-      "keywords": ["address", "where", "location", "located", "direction", "directions", "banga", "phagwara", "map"]
+      "keywords": ["address", "where", "location", "located", "direction", "directions", "banga", "phagwara", "map", "kahan", "kithhe", "kithe"]
     },
     {
       "id": "parking",
@@ -129,7 +129,7 @@
     {
       "id": "services",
       "question": "Which services do you offer?",
-      "answer": "Check-ups and cleaning, fillings and root canal, braces and aligners, children's dentistry, general physician OPD, and dentures and implants. This is a demo list, not medical advice.",
+      "answer": "Check-ups and cleaning, fillings and root canal, braces and aligners, children's dentistry, general physician OPD, and dentures and implants. This is a sample list, not medical advice.",
       "keywords": ["service", "services", "dental", "cleaning", "filling", "fillings", "root", "canal", "root canal", "braces", "aligner", "aligners", "denture", "dentures", "implant", "implants", "physician", "opd", "treatment"]
     },
     {
@@ -141,7 +141,7 @@
     {
       "id": "fees",
       "question": "How much is a cleaning?",
-      "answer": "The doctor explains your options and gives an estimate before any treatment begins. [Placeholder: consultation and treatment fees go here]. This demo does not publish prices.",
+      "answer": "The doctor explains your options and gives an estimate before any treatment begins. [Placeholder: consultation and treatment fees go here]. This sample site does not publish prices.",
       "keywords": ["fee", "fees", "cost", "costs", "price", "prices", "charge", "charges", "kitna", "payment", "pay", "how much", "cleaning cost"]
     },
     {
@@ -159,7 +159,7 @@
     {
       "id": "doctors",
       "question": "Who are the doctors?",
-      "answer": "Dr. Simran Kaur (BDS, dental surgeon) and Dr. Harjot Singh (MBBS, general physician). Both names are fictional placeholders.",
+      "answer": "Dentist (placeholder) and General physician (placeholder). No clinician names or degrees are listed.",
       "keywords": ["doctor", "doctors", "dentist", "clinician", "simran", "harjot", "kaur", "singh"]
     },
     {
@@ -171,20 +171,20 @@
     {
       "id": "contact",
       "question": "How do I contact the clinic?",
-      "answer": "Call +91 00000 00000 (a placeholder), use the WhatsApp button, or send an appointment request in the assistant. The email is hello@vehra-demo.example.",
+      "answer": "Call +91 00000 00000 (a placeholder), use the WhatsApp button, or send an appointment request in the assistant. The email is hello@vehra.example.",
       "keywords": ["phone", "call", "whatsapp", "email", "contact", "reach"]
     },
     {
       "id": "sunday",
       "question": "What if I have a dental emergency on Sunday?",
-      "answer": "Call the clinic number. If the doctor is unavailable, the recording gives the nearest emergency option. Sunday clinic hours are closed.",
-      "keywords": ["emergency", "sunday emergency"]
+      "answer": "The clinic is closed on Sunday. For a medical emergency, call 112, or 108 for an ambulance.",
+      "keywords": ["sunday closed", "sunday hours"]
     },
     {
-      "id": "demo",
+      "id": "sample",
       "question": "Is this a real clinic?",
-      "answer": "No. This is a demo of a fictional business. Vehra Dental & Family Clinic does not provide medical care.",
-      "keywords": ["real", "fictional", "demo", "fake", "actual"]
+      "answer": "No. This is a sample site for a fictional business. Vehra Dental & Family Clinic does not provide medical care.",
+      "keywords": ["real", "fictional", "fake", "actual", "sample"]
     },
     {
       "id": "booking-how",

@@ -1,4 +1,5 @@
 import type { ClinicContent } from "@/lib/clinic"
+import type { Locale } from "@/lib/voice"
 
 export type LlmProvider = "openai" | "groq" | "gemini" | "openrouter" | "none"
 
@@ -28,12 +29,15 @@ export function llmConfig(): { provider: LlmProvider; apiKey: string; model: str
   }
 }
 
-export function systemPrompt(clinic: ClinicContent): string {
+export function systemPrompt(clinic: ClinicContent, locale: Locale = "en"): string {
+  const language = locale === "hi" ? "Hindi" : locale === "pa" ? "Punjabi" : "the same language the person used"
   return [
-    `You are the website assistant for ${clinic.name}, a fictional clinic used as a portfolio demo.`,
-    "Answer only from the clinic notes below. If the notes do not say it, say the demo notes do not include that.",
+    `You are the website assistant for ${clinic.name}, a fictional clinic on a sample site.`,
+    "Answer only from the clinic notes below. If the notes do not say it, say the notes do not include that.",
     "Do not invent reviews, testimonials, ratings, awards, patient counts, years of experience, or fees.",
-    "Do not give medical advice or pretend a real person has been booked.",
+    "Do not give medical advice, diagnose, or promise that a treatment will work. Do not pretend a real person has been booked.",
+    "If the person may be having a medical emergency — chest pain, trouble breathing, unconsciousness, heavy bleeding, an accident, swelling of the face or throat, or a request for an ambulance — tell them to call 112 now, or 108 for an ambulance. Say that in their language. Never give the clinic phone number for an emergency.",
+    `Reply in ${language}. If they write in Devanagari, reply in Hindi. If they write in Gurmukhi, reply in Punjabi. Use everyday spoken language.`,
     "Keep the reply under 120 words, in plain sentences.",
     "",
     "Clinic notes:",
@@ -41,12 +45,12 @@ export function systemPrompt(clinic: ClinicContent): string {
   ].join("\n")
 }
 
-export async function answerWithLlm(question: string, clinic: ClinicContent): Promise<string> {
+export async function answerWithLlm(question: string, clinic: ClinicContent, locale: Locale = "en"): Promise<string> {
   const config = llmConfig()
   if (!config.enabled) {
     throw new Error("LLM is not configured")
   }
-  const system = systemPrompt(clinic)
+  const system = systemPrompt(clinic, locale)
   if (config.provider === "gemini") {
     return gemini(config.apiKey, config.model, system, question)
   }

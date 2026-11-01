@@ -14,7 +14,7 @@ export type ClinicHours = {
 export type ClinicContent = {
   name: string
   shortName: string
-  demoLabel: string
+  sampleLabel: string
   address: {
     line1: string
     line2: string
@@ -64,10 +64,10 @@ function assertClinic(value: ClinicContent): void {
 
 export function getClinic(): ClinicContent {
   const clinic: ClinicContent = {
-    ...(raw as Omit<ClinicContent, "name" | "shortName" | "demoLabel">),
+    ...(raw as Omit<ClinicContent, "name" | "shortName" | "sampleLabel">),
     name: brand.name,
     shortName: brand.shortName,
-    demoLabel: brand.demoLabel,
+    sampleLabel: brand.sampleLabel,
   }
   assertClinic(clinic)
   return clinic
