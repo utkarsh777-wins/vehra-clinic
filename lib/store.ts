@@ -18,7 +18,6 @@ export type StoredBooking = AppointmentRequest & {
   idempotencyKey?: string
   supersedes?: string
   supersededAt?: string
-  sessionToken?: string
 }
 
 export type SaveResult = {
@@ -32,7 +31,6 @@ export type SaveInput = AppointmentRequest & {
   language?: Locale
   idempotencyKey?: string
   supersedes?: string
-  sessionToken?: string
 }
 
 let chain: Promise<unknown> = Promise.resolve()
@@ -80,7 +78,6 @@ export async function saveBooking(input: SaveInput, now = new Date()): Promise<S
     language: input.language ?? "en",
     ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
     ...(input.supersedes ? { supersedes: input.supersedes } : {}),
-    ...(input.sessionToken ? { sessionToken: input.sessionToken } : {}),
   }
 
   const primary = resolveStorePath()
@@ -137,13 +134,10 @@ async function appendBooking(
       if (!previous || previous.status === "superseded") {
         throw new Error("Cannot supersede booking: booking not found or already superseded.")
       }
-      const sameSession = Boolean(draft.sessionToken && previous.sessionToken && draft.sessionToken === previous.sessionToken)
-      const samePhone = Boolean(draft.phone && previous.phone && draft.phone === previous.phone)
-      if (!sameSession && !samePhone) {
-        throw new Error("Cannot supersede booking: request must come from the same signed session or matching phone number.")
-      }
-      if (!draft.sessionToken && previous.sessionToken) {
-        draft.sessionToken = previous.sessionToken
+      const draftPhone = (draft.phone ?? "").replace(/\D/g, "")
+      const prevPhone = (previous.phone ?? "").replace(/\D/g, "")
+      if (!draftPhone || draftPhone !== prevPhone) {
+        throw new Error("Cannot supersede booking: request must come from matching phone number.")
       }
       previous.status = "superseded"
       previous.supersededAt = draft.createdAt

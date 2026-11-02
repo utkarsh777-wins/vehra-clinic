@@ -53,7 +53,7 @@ export async function runAssistantTurn(input: {
 }): Promise<ChatSuccess | ChatFailure> {
   const locale = resolveLocale(textOf(input), input.locale)
   if (input.intent === "submit_booking") {
-    return submitBooking(input.draft, input.now ?? new Date(), locale, input.idempotencyKey, input.supersedes, typeof input.sessionToken === "string" ? input.sessionToken : undefined)
+    return submitBooking(input.draft, input.now ?? new Date(), locale, input.idempotencyKey, input.supersedes)
   }
   if (typeof input.message !== "string") {
     return { status: 400, body: { error: "Message must be a string." } }
@@ -117,14 +117,16 @@ export async function runAssistantTurn(input: {
           language: locale,
           idempotencyKey: cleanKey(input.idempotencyKey),
           supersedes: cleanId(input.supersedes),
-          sessionToken: typeof input.sessionToken === "string" ? input.sessionToken : undefined,
         },
         now,
       )
       reply = `${turn.reply}\n\n${deliveryLine(saved.booking.id, saved.webhook, saved.replay, locale)}`
       booking = publicBooking(saved.booking, saved.webhook)
       session = turn.session
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Cannot supersede booking")) {
+        return { status: 400, body: { error: error.message } }
+      }
       const held = incoming.step ? incoming : { ...incoming, mode: "booking" as const, step: "confirm" as const }
       return {
         status: 200,
@@ -162,7 +164,6 @@ async function submitBooking(
   locale: Locale,
   idempotencyKey: unknown,
   supersedes: unknown,
-  sessionToken?: string,
 ): Promise<ChatSuccess | ChatFailure> {
   const clinic = getPublicClinic()
   const record =
@@ -208,7 +209,6 @@ async function submitBooking(
         language: locale,
         idempotencyKey: cleanKey(idempotencyKey),
         supersedes: cleanId(supersedes),
-        sessionToken,
       },
       now,
     )
@@ -225,7 +225,10 @@ async function submitBooking(
         sampleLabel: clinic.sampleLabel,
       },
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Cannot supersede booking")) {
+      return { status: 400, body: { error: error.message } }
+    }
     return { status: 500, body: { error: "I could not store that request on this server." } }
   }
 }

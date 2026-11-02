@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { GET } from "@/app/api/bookings/route"
 import { POST } from "@/app/api/chat/route"
+import { runAssistantTurn } from "@/lib/assistant"
 import { handleTurn, initialSession, parseName, preserveTime, validateAppointment } from "@/lib/booking"
 import { getClinic } from "@/lib/clinic"
 import { resetGuards } from "@/lib/guard"
@@ -166,6 +167,17 @@ describe("emergencies", () => {
     ["what is the ambulance number", "en"],
     ["accident, heavy bleeding", "en"],
     ["heart attack", "en"],
+    ["swollen face", "en"],
+    ["throat swelling", "en"],
+    ["swelling spreading to my eye", "en"],
+    ["I can't swallow", "en"],
+    ["difficulty swallowing", "en"],
+    ["bleeding won't stop", "en"],
+    ["can't stop the bleeding", "en"],
+    ["jaw injury", "en"],
+    ["broken jaw", "en"],
+    ["hurt my jaw", "en"],
+    ["knocked out tooth", "en"],
     // HI escalate
     ["बहुत तेज़ दर्द है", "hi"],
     ["दाँत में तेज़ दर्द है", "hi"],
@@ -175,6 +187,11 @@ describe("emergencies", () => {
     ["behosh hai", "hi"],
     ["भारी खून बह रहा है", "hi"],
     ["चेहरे पर सूजन है", "hi"],
+    ["आँख तक सूजन", "hi"],
+    ["जबड़े में चोट", "hi"],
+    ["जबड़ा टूट गया", "hi"],
+    ["सांस नहीं आ रही", "hi"],
+    ["सांस लेने में तकलीफ", "hi"],
     // PA escalate
     ["ਬਹੁਤ ਤੇਜ਼ ਦਰਦ ਹੈ", "pa"],
     ["ਤੇਜ਼ ਦਰਦ ਹੋ ਰਿਹਾ ਹੈ", "pa"],
@@ -183,6 +200,15 @@ describe("emergencies", () => {
     ["ਮੈਨੂੰ ਸਾਹ ਨਹੀਂ ਆ ਰਿਹਾ", "pa"],
     ["ਬੇਹੋਸ਼ ਹੋ ਗਿਆ ਹੈ", "pa"],
     ["ਭਾਰੀ ਖੂਨ ਨਿਕਲ ਰਿਹਾ ਹੈ", "pa"],
+    ["ਅੱਖ ਤੱਕ ਸੋਜ", "pa"],
+    ["ਖੂਨ ਨਹੀਂ ਰੁਕ ਰਿਹਾ", "pa"],
+    ["ਜਬਾੜੇ ਤੇ ਸੱਟ", "pa"],
+    ["ਸਾਹ ਨਹੀਂ ਆ ਰਿਹਾ", "pa"],
+    // Romanised Hindi/Punjabi escalate
+    ["bahut khoon beh raha hai", "hi"],
+    ["khoon nahi ruk raha", "hi"],
+    ["chehre pe sujan", "hi"],
+    ["jabda toot gaya", "hi"],
   ])("escalates %s to 112 emergency path in %s", (message, lang) => {
     const locale = (lang as "en" | "hi" | "pa") || resolveLocale(message)
     const turn = say(message, { mode: "booking", step: "reason", draft: { name: "Ada Kaur" } }, locale)
@@ -208,6 +234,9 @@ describe("emergencies", () => {
     ["ਦੰਦ ਵਿੱਚ ਦਰਦ ਹੈ", "pa"],
     ["ਦਰਦ ਹੈ", "pa"],
     ["ਮਸੂੜਿਆਂ ਵਿੱਚੋਂ ਖੂਨ ਆ ਰਿਹਾ ਹੈ", "pa"],
+    // Bad-breath non-escalate
+    ["सांस की बदबू", "hi"],
+    ["saans ki badboo", "hi"],
   ])("does NOT escalate plain pain or bleeding gums (%s) to 112, gives symptom reply", (message, lang) => {
     const locale = lang as "en" | "hi" | "pa"
     const turn = say(message, initialSession(), locale)
@@ -267,11 +296,52 @@ describe("duplicates and references", () => {
     expect(stored.find((row) => row.id === changed.booking.id)?.time).toBe("10:30")
   })
 
-  it("allows supersede only from the same signed session or matching phone, otherwise refuses", async () => {
+  it("refuses shared-T0 attack with different phone, allows supersede with matching phone", async () => {
     const first = await saveBooking(
-      { ...validDraft, phone: "9876543210", sessionToken: "session-sig-1" },
+      { ...validDraft, phone: "9876543210" },
       now,
     )
+    expect(first.booking).not.toHaveProperty("sessionToken")
+
+    const storedAfterFirst = JSON.parse(await readFile(process.env.BOOKINGS_STORE_PATH!, "utf8")) as Record<string, unknown>[]
+    expect(storedAfterFirst[0]).not.toHaveProperty("sessionToken")
+
+    // Get the deterministic token from a plain FAQ turn via runAssistantTurn
+    const faqTurn = await runAssistantTurn({ message: "What are your hours?", now })
+    expect(faqTurn.status).toBe(200)
+    const token = (faqTurn as { body: { sessionToken: string } }).body.sessionToken
+    expect(token).toBeTruthy()
+
+    // Shared-T0 attack: try to supersede victim booking ref with a different phone plus that token
+    const attack = await chat({
+      intent: "submit_booking",
+      sessionToken: token,
+      supersedes: first.booking.id,
+      draft: {
+        ...validDraft,
+        name: "Attacker",
+        phone: "9123456780",
+        time: "11:00",
+      },
+    })
+    expect(attack.status).toBe(400)
+    const attackBody = await attack.json()
+    expect(attackBody.error).toMatch(/Cannot supersede booking/)
+
+    // Direct saveBooking attempt with different phone is also refused
+    await expect(
+      saveBooking(
+        { ...validDraft, name: "Attacker", phone: "9123456780", supersedes: first.booking.id },
+        now,
+      ),
+    ).rejects.toThrow(/Cannot supersede booking/)
+
+    // Victim booking stays active
+    const storedAfterAttack = JSON.parse(await readFile(process.env.BOOKINGS_STORE_PATH!, "utf8")) as { id: string; status: string; name: string }[]
+    expect(storedAfterAttack).toHaveLength(1)
+    expect(storedAfterAttack[0].id).toBe(first.booking.id)
+    expect(storedAfterAttack[0].status).toBe("active")
+    expect(storedAfterAttack[0].name).toBe("Ada Kaur")
 
     // Supersede with matching phone succeeds
     const byPhone = await saveBooking(
@@ -279,21 +349,13 @@ describe("duplicates and references", () => {
       now,
     )
     expect(byPhone.booking.time).toBe("11:00")
+    expect(byPhone.booking).not.toHaveProperty("sessionToken")
 
-    // Supersede with matching session token succeeds even with changed phone
-    const bySession = await saveBooking(
-      { ...validDraft, phone: "9123456780", sessionToken: "session-sig-1", time: "12:00", supersedes: byPhone.booking.id },
-      now,
-    )
-    expect(bySession.booking.phone).toBe("9123456780")
-
-    // Refuse when neither session nor phone matches
-    await expect(
-      saveBooking(
-        { ...validDraft, phone: "9999988888", sessionToken: "other-session", supersedes: bySession.booking.id },
-        now,
-      ),
-    ).rejects.toThrow(/Cannot supersede booking/)
+    const storedAfterPhone = JSON.parse(await readFile(process.env.BOOKINGS_STORE_PATH!, "utf8")) as { id: string; status: string; time: string; sessionToken?: unknown }[]
+    expect(storedAfterPhone).toHaveLength(2)
+    expect(storedAfterPhone.find((row) => row.id === first.booking.id)?.status).toBe("superseded")
+    expect(storedAfterPhone.find((row) => row.id === byPhone.booking.id)?.time).toBe("11:00")
+    expect(storedAfterPhone[1]).not.toHaveProperty("sessionToken")
 
     // Refuse when superseding an already superseded booking
     await expect(

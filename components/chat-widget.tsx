@@ -248,7 +248,6 @@ export function ChatWidget() {
           intent: "submit_booking",
           message: "",
           locale,
-          sessionToken: sessionToken ?? undefined,
           idempotencyKey: currentForm.idempotencyKey,
           supersedes: currentForm.supersedes,
           draft: {
@@ -264,7 +263,6 @@ export function ChatWidget() {
         reply?: string
         field?: string
         booking?: BookingCard | null
-        sessionToken?: string
         error?: string
       }
       if (payload.field) {
@@ -272,7 +270,6 @@ export function ChatWidget() {
         return
       }
       if (!response.ok || !payload.booking) throw new Error(payload.error || "failed")
-      if (payload.sessionToken) setSessionToken(payload.sessionToken)
       const booking = payload.booking
       setFormOn(false)
       setBubbles((current) => [
