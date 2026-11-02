@@ -53,7 +53,7 @@ export async function runAssistantTurn(input: {
 }): Promise<ChatSuccess | ChatFailure> {
   const locale = resolveLocale(textOf(input), input.locale)
   if (input.intent === "submit_booking") {
-    return submitBooking(input.draft, input.now ?? new Date(), locale, input.idempotencyKey, input.supersedes)
+    return submitBooking(input.draft, input.now ?? new Date(), locale, input.idempotencyKey, input.supersedes, typeof input.sessionToken === "string" ? input.sessionToken : undefined)
   }
   if (typeof input.message !== "string") {
     return { status: 400, body: { error: "Message must be a string." } }
@@ -95,11 +95,11 @@ export async function runAssistantTurn(input: {
 
   if (turn.pending) {
     const checked = validateAppointment(turn.pending, clinic, now, locale)
-    if (!checked.ok || isEmergency(`${turn.pending.name} ${turn.pending.reason}`)) {
+    if (!checked.ok || isEmergency(turn.pending.name)) {
       return {
         status: 200,
         body: {
-          reply: isEmergency(`${turn.pending.name} ${turn.pending.reason}`) ? emergencyReply(locale) : checked.ok ? emergencyReply(locale) : checked.error,
+          reply: isEmergency(turn.pending.name) ? emergencyReply(locale) : checked.ok ? emergencyReply(locale) : checked.error,
           session: incoming.step ? incoming : { ...incoming, mode: "booking", step: "confirm" },
           sessionToken: signSession(incoming.step ? incoming : { ...incoming, mode: "booking", step: "confirm" }),
           suggestions: ["Yes, submit", "Cancel"],
@@ -117,6 +117,7 @@ export async function runAssistantTurn(input: {
           language: locale,
           idempotencyKey: cleanKey(input.idempotencyKey),
           supersedes: cleanId(input.supersedes),
+          sessionToken: typeof input.sessionToken === "string" ? input.sessionToken : undefined,
         },
         now,
       )
@@ -161,13 +162,14 @@ async function submitBooking(
   locale: Locale,
   idempotencyKey: unknown,
   supersedes: unknown,
+  sessionToken?: string,
 ): Promise<ChatSuccess | ChatFailure> {
   const clinic = getPublicClinic()
   const record =
     draft && typeof draft === "object"
       ? (draft as { name?: unknown; phone?: unknown; date?: unknown; time?: unknown; reason?: unknown })
       : {}
-  const blob = `${typeof record.name === "string" ? record.name : ""} ${typeof record.reason === "string" ? record.reason : ""}`
+  const blob = typeof record.name === "string" ? record.name : ""
   if (isEmergency(blob)) {
     return {
       status: 200,
@@ -206,6 +208,7 @@ async function submitBooking(
         language: locale,
         idempotencyKey: cleanKey(idempotencyKey),
         supersedes: cleanId(supersedes),
+        sessionToken,
       },
       now,
     )

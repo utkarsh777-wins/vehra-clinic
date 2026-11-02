@@ -121,9 +121,6 @@ export function HomePage({ whatsappHref }: { whatsappHref: string }) {
         <section className="hero" aria-labelledby="hero-h">
           <div className="wrap hero__grid">
             <div className="hero__copy">
-              <p className="tag">
-                <span aria-hidden="true">●</span> {t.hero.tag}
-              </p>
               <p className="eyebrow">{t.hero.eyebrow}</p>
               <h1 id="hero-h" className="display">
                 {t.hero.line2 ? (
@@ -414,7 +411,7 @@ export function HomePage({ whatsappHref }: { whatsappHref: string }) {
         </div>
         <div className="wrap foot__legal">
           <p>
-            <strong>Sample site.</strong> {t.footer.legal}
+            {t.footer.legal}
           </p>
           <p>{t.footer.credit}</p>
         </div>

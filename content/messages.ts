@@ -13,7 +13,6 @@ const en = {
     home: "Vehra Dental and Family Clinic, home",
   },
   hero: {
-    tag: "Sample site",
     eyebrow: "Dental & family clinic · Banga Road, Phagwara",
     line1: "Care that",
     line2: "takes its",
@@ -175,7 +174,7 @@ const en = {
     retry: "Try again",
     orCall: "or call",
     lang: "Language",
-    disclaimer: "Sample site · AI assistant · may make mistakes",
+    disclaimer: "AI assistant · may make mistakes",
     replyPa: "Reply in ਪੰਜਾਬੀ?",
   },
   log: {
@@ -218,7 +217,6 @@ const hi: Messages = {
     home: "वेहरा डेंटल और फ़ैमिली क्लिनिक, होम",
   },
   hero: {
-    tag: "Sample site",
     eyebrow: "डेंटल और फ़ैमिली क्लिनिक · बंगा रोड, फगवाड़ा",
     line1: "देखभाल, जो आपको पूरा समय दे।",
     line2: "",
@@ -378,7 +376,7 @@ const hi: Messages = {
     retry: "फिर कोशिश करें",
     orCall: "या फ़ोन करें",
     lang: "भाषा",
-    disclaimer: "Sample site · एआई सहायक · गलती हो सकती है",
+    disclaimer: "एआई सहायक · गलती हो सकती है",
     replyPa: "पंजाबी में जवाब चाहिए?",
   },
   log: {
@@ -406,7 +404,6 @@ const pa: Messages = {
     home: "ਵੇਹਰਾ ਡੈਂਟਲ ਅਤੇ ਫੈਮਿਲੀ ਕਲੀਨਿਕ, ਮੁੱਖ ਪੰਨਾ",
   },
   hero: {
-    tag: "Sample site",
     eyebrow: "ਡੈਂਟਲ ਅਤੇ ਫੈਮਿਲੀ ਕਲੀਨਿਕ · ਬੰਗਾ ਰੋਡ, ਫਗਵਾੜਾ",
     line1: "ਸੰਭਾਲ, ਜੋ ਤੁਹਾਨੂੰ ਪੂਰਾ ਸਮਾਂ ਦੇਵੇ।",
     line2: "",
@@ -566,7 +563,7 @@ const pa: Messages = {
     retry: "ਫਿਰ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
     orCall: "ਜਾਂ ਫ਼ੋਨ ਕਰੋ",
     lang: "ਭਾਸ਼ਾ",
-    disclaimer: "Sample site · ਏਆਈ ਸਹਾਇਕ · ਗਲਤੀ ਹੋ ਸਕਦੀ ਹੈ",
+    disclaimer: "ਏਆਈ ਸਹਾਇਕ · ਗਲਤੀ ਹੋ ਸਕਦੀ ਹੈ",
     replyPa: "ਪੰਜਾਬੀ ਵਿੱਚ ਜਵਾਬ?",
   },
   log: {

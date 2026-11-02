@@ -309,7 +309,7 @@ export function handleTurn(input: {
     return { ...answer(localizeFaq(match.id, locale, match.answer), session, true, locale), faqId: match.id }
   }
 
-  if (/\b(pain|symptom|symptoms|hurt|hurts|medicine|dose|infection|diagnosis)\b/i.test(message)) {
+  if (/\b(pain|symptom|symptoms|hurt|hurts|medicine|dose|infection|diagnosis|dard|bleeding\s*gums?)\b/i.test(message) || /दर्द|ਦਰਦ|मसूड़ों|ਮਸੂੜਿਆਂ/.test(message)) {
     return answer(v.symptom, session, false, locale)
   }
 

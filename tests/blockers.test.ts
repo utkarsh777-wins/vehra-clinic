@@ -10,7 +10,7 @@ import { getClinic } from "@/lib/clinic"
 import { resetGuards } from "@/lib/guard"
 import { openTodayLabel } from "@/lib/open-status"
 import { saveBooking } from "@/lib/store"
-import { resolveLocale } from "@/lib/voice"
+import { resolveLocale, voice } from "@/lib/voice"
 
 const clinic = getClinic()
 const now = new Date("2026-10-29T04:30:00.000Z")
@@ -153,18 +153,38 @@ describe("names", () => {
 
 describe("emergencies", () => {
   it.each([
+    // EN escalate
     ["severe pain in my tooth", "en"],
-    ["heart attack", "en"],
+    ["unbearable pain in my mouth", "en"],
+    ["heavy bleeding", "en"],
+    ["uncontrolled bleeding", "en"],
+    ["severe swelling on my face", "en"],
+    ["swelling with fever", "en"],
+    ["facial trauma after fall", "en"],
+    ["I have chest pain", "en"],
     ["my father cannot breathe", "en"],
     ["what is the ambulance number", "en"],
-    ["I have chest pain", "en"],
     ["accident, heavy bleeding", "en"],
+    ["heart attack", "en"],
+    // HI escalate
+    ["बहुत तेज़ दर्द है", "hi"],
+    ["दाँत में तेज़ दर्द है", "hi"],
+    ["बहुत दर्द हो रहा है", "hi"],
     ["सीने में दर्द है", "hi"],
     ["saans nahi aa rahi", "hi"],
-    ["ਮੈਨੂੰ ਸਾਹ ਨਹੀਂ ਆ ਰਿਹਾ", "pa"],
     ["behosh hai", "hi"],
-  ])("answers %s with 112 and 108", (message) => {
-    const locale = resolveLocale(message)
+    ["भारी खून बह रहा है", "hi"],
+    ["चेहरे पर सूजन है", "hi"],
+    // PA escalate
+    ["ਬਹੁਤ ਤੇਜ਼ ਦਰਦ ਹੈ", "pa"],
+    ["ਤੇਜ਼ ਦਰਦ ਹੋ ਰਿਹਾ ਹੈ", "pa"],
+    ["ਬਹੁਤ ਦਰਦ ਹੈ", "pa"],
+    ["ਛਾਤੀ ਵਿੱਚ ਦਰਦ ਹੈ", "pa"],
+    ["ਮੈਨੂੰ ਸਾਹ ਨਹੀਂ ਆ ਰਿਹਾ", "pa"],
+    ["ਬੇਹੋਸ਼ ਹੋ ਗਿਆ ਹੈ", "pa"],
+    ["ਭਾਰੀ ਖੂਨ ਨਿਕਲ ਰਿਹਾ ਹੈ", "pa"],
+  ])("escalates %s to 112 emergency path in %s", (message, lang) => {
+    const locale = (lang as "en" | "hi" | "pa") || resolveLocale(message)
     const turn = say(message, { mode: "booking", step: "reason", draft: { name: "Ada Kaur" } }, locale)
     expect(turn.reply).toMatch(/112/)
     expect(turn.reply).toMatch(/108/)
@@ -172,6 +192,40 @@ describe("emergencies", () => {
     expect(turn.pending).toBeUndefined()
     if (locale === "hi") expect(turn.reply).toMatch(/कॉल/)
     if (locale === "pa") expect(turn.reply).toMatch(/ਕਾਲ/)
+  })
+
+  it.each([
+    // EN non-escalate
+    ["pain in my back molar", "en"],
+    ["I have tooth pain", "en"],
+    ["bleeding gums", "en"],
+    // HI non-escalate
+    ["दाँत में दर्द है", "hi"],
+    ["दर्द हो रहा है", "hi"],
+    ["मसूड़ों से खून आ रहा है", "hi"],
+    ["daant mein dard", "hi"],
+    // PA non-escalate
+    ["ਦੰਦ ਵਿੱਚ ਦਰਦ ਹੈ", "pa"],
+    ["ਦਰਦ ਹੈ", "pa"],
+    ["ਮਸੂੜਿਆਂ ਵਿੱਚੋਂ ਖੂਨ ਆ ਰਿਹਾ ਹੈ", "pa"],
+  ])("does NOT escalate plain pain or bleeding gums (%s) to 112, gives symptom reply", (message, lang) => {
+    const locale = lang as "en" | "hi" | "pa"
+    const turn = say(message, initialSession(), locale)
+    expect(turn.reply).not.toMatch(/112/)
+    expect(turn.reply).not.toMatch(/108/)
+    expect(turn.reply).toBe(voice(locale).symptom)
+  })
+
+  it("booking form accepts reason like 'दाँत में दर्द' without being blocked by emergency detection", async () => {
+    const response = await chat({
+      intent: "submit_booking",
+      draft: { ...validDraft, reason: "दाँत में दर्द" },
+    })
+    expect(response.status).toBe(200)
+    const payload = await response.json()
+    expect(payload.booking).not.toBeNull()
+    expect(payload.booking.reason).toBe("दाँत में दर्द")
+    expect(payload.reply).not.toMatch(/112/)
   })
 
   it("counts हाँ and ਹਾਂ as yes and keeps a renamed person", () => {
@@ -211,6 +265,43 @@ describe("duplicates and references", () => {
     expect(stored).toHaveLength(2)
     expect(stored.find((row) => row.id === first.booking.id)?.status).toBe("superseded")
     expect(stored.find((row) => row.id === changed.booking.id)?.time).toBe("10:30")
+  })
+
+  it("allows supersede only from the same signed session or matching phone, otherwise refuses", async () => {
+    const first = await saveBooking(
+      { ...validDraft, phone: "9876543210", sessionToken: "session-sig-1" },
+      now,
+    )
+
+    // Supersede with matching phone succeeds
+    const byPhone = await saveBooking(
+      { ...validDraft, phone: "9876543210", time: "11:00", supersedes: first.booking.id },
+      now,
+    )
+    expect(byPhone.booking.time).toBe("11:00")
+
+    // Supersede with matching session token succeeds even with changed phone
+    const bySession = await saveBooking(
+      { ...validDraft, phone: "9123456780", sessionToken: "session-sig-1", time: "12:00", supersedes: byPhone.booking.id },
+      now,
+    )
+    expect(bySession.booking.phone).toBe("9123456780")
+
+    // Refuse when neither session nor phone matches
+    await expect(
+      saveBooking(
+        { ...validDraft, phone: "9999988888", sessionToken: "other-session", supersedes: bySession.booking.id },
+        now,
+      ),
+    ).rejects.toThrow(/Cannot supersede booking/)
+
+    // Refuse when superseding an already superseded booking
+    await expect(
+      saveBooking(
+        { ...validDraft, phone: "9876543210", supersedes: first.booking.id },
+        now,
+      ),
+    ).rejects.toThrow(/Cannot supersede booking/)
   })
 
   it("issues unique public references backed by a uuid", async () => {
@@ -253,6 +344,37 @@ describe("request guards", () => {
 
     const foreign = await chat({ message: "hello" }, { origin: "https://evil.example" })
     expect(foreign.status).toBe(403)
+
+    // Origin check: x-forwarded-host behind proxy, host, and ALLOWED_ORIGINS env var
+    const proxyReq = await chat(
+      { message: "hello" },
+      {
+        origin: "https://clinic.vercel.app",
+        "x-forwarded-host": "clinic.vercel.app",
+        host: "localhost:3000",
+      },
+    )
+    expect(proxyReq.status).toBe(200)
+
+    const hostReq = await chat(
+      { message: "hello" },
+      {
+        origin: "http://localhost:3000",
+        host: "localhost:3000",
+      },
+    )
+    expect(hostReq.status).toBe(200)
+
+    process.env.ALLOWED_ORIGINS = "https://custom.clinic.com, https://other.clinic.com"
+    const allowedReq = await chat(
+      { message: "hello" },
+      {
+        origin: "https://custom.clinic.com",
+        host: "localhost:3000",
+      },
+    )
+    expect(allowedReq.status).toBe(200)
+    delete process.env.ALLOWED_ORIGINS
 
     const huge = await POST(
       new Request("http://localhost/api/chat", {

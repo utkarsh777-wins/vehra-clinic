@@ -2,13 +2,13 @@ import type { Locale } from "@/content/messages"
 import { normalize } from "@/lib/text"
 
 const SCRIPT = [
-  /chest\s*pain|heart\s*attack|cannot\s*breathe|can't\s*breathe|cant\s*breathe|difficulty\s*breathing|shortness\s*of\s*breath|unconscious|not\s*breathing|heavy\s*bleeding|\bbleeding\b|\baccident\b|severe\s*pain|\bambulance\b|swelling\s+of\s+(?:the\s+)?(?:face|throat)|(?:face|throat)\s+(?:is\s+)?swollen|\bemergency\b/i,
-  /सांस|साँस|बेहोश|खून|दुर्घटना|एम्बुलेंस|एम्ब्युलेंस|सीने\s*में\s*दर्द|छाती\s*में\s*दर्द|बहुत\s*दर्द|तेज\s*दर्द|तेज़\s*दर्द|दर्द/,
-  /ਸਾਹ|ਬੇਹੋਸ|ਖੂਨ|ਦਰਦ|ਐਂਬੂਲੈਂਸ|ਹਾਦਸਾ/,
+  /chest\s*pain|heart\s*attack|cannot\s*breathe|can't\s*breathe|cant\s*breathe|difficulty\s*breathing|trouble\s*breathing|shortness\s*of\s*breath|not\s*breathing|unconscious|(?:heavy|uncontrolled|severe)\s+bleeding|bleeding\s+(?:heavily|uncontrollably|severely)|\baccident\b|severe\s*pain|unbearable\s*pain|\bunbearable\b|\bambulance\b|severe\s*swelling|swelling\s+with\s+(?:fever|trouble\s*breathing|difficulty\s*breathing|shortness\s*of\s*breath)|(?:fever|trouble\s*breathing|difficulty\s*breathing|shortness\s*of\s*breath)\s+with\s+swelling|swelling\s+of\s+(?:the\s+)?(?:face|throat)|(?:face|throat)\s+(?:is\s+)?swollen|facial\s*trauma|face\s*trauma|\bemergency\b/i,
+  /सांस|साँस|बेहोश|दुर्घटना|एम्बुलेंस|एम्ब्युलेंस|सीने\s*में\s*दर्द|छाती\s*में\s*दर्द|बहुत\s*तेज़\s*दर्द|बहुत\s*तेज\s*दर्द|तेज़\s*दर्द|तेज\s*दर्द|बहुत\s*दर्द|बहुत\s*तेज़|बहुत\s*तेज|असहनीय\s*दर्द|असहनीय|भारी\s*खून|बहुत\s*(?:ज़्यादा|ज्यादा)?\s*खून|अनियंत्रित\s*खून|खून\s*(?:रुक\s*नहीं|बहता\s*जा\s*रहा)|गंभीर\s*सूजन|चेहरे\s*(?:पर)?\s*सूजन|गले\s*(?:में)?\s*सूजन|सूजन\s+के\s+साथ\s+(?:बुखार|सांस)|(?:बुखार|सांस)\s+के\s+साथ\s+सूजन|चेहरे\s*(?:पर)?\s*चोट/,
+  /ਸਾਹ|ਬੇਹੋਸ਼|ਬੇਹੋਸ|ਐਂਬੂਲੈਂਸ|ਹਾਦਸਾ|ਛਾਤੀ\s*ਵਿੱਚ\s*ਦਰਦ|ਬਹੁਤ\s*ਤੇਜ਼\s*ਦਰਦ|ਤੇਜ਼\s*ਦਰਦ|ਬਹੁਤ\s*ਦਰਦ|ਬਹੁਤ\s*ਤੇਜ਼|ਅਸਹਿ\s*ਦਰਦ|ਅਸਹਿ|ਭਾਰੀ\s*ਖੂਨ|ਬਹੁਤ\s*(?:ਜ਼ਿਆਦਾ)?\s*ਖੂਨ|ਅਣਰੋਕਿਆ\s*ਖੂਨ|ਗੰਭੀਰ\s*ਸੋਜ|ਚਿਹਰੇ\s*(?:ਤੇ)?\s*ਸੋਜ|ਗਲੇ\s*(?:ਵਿੱਚ)?\s*ਸੋਜ|ਸੋਜ\s+ਨਾਲ\s+(?:ਬੁਖਾਰ|ਸਾਹ)|(?:ਬੁਖਾਰ|ਸਾਹ)\s+ਨਾਲ\s+ਸੋਜ|ਚਿਹਰੇ\s*(?:ਤੇ)?\s*ਸੱਟ/,
 ]
 
 const LATIN =
-  /\b(saans|sans|behosh|behoshi|behos|khoon|seene mein|chaati|chaati mein|ambulance|dil ka daura|heart attack|chest pain|unconscious|bleeding|accident|severe pain|saah|dard|behosh hai)\b/i
+  /\b(saans|sans|behosh|behoshi|behos|behosh hai|seene mein|chaati|chaati mein|ambulance|dil ka daura|heart attack|chest pain|unconscious|accident|severe pain|unbearable pain|unbearable|bahut tez|bohot tez|bahut tez dard|bohot tez dard|bahut dard|bohot dard|tez dard|heavy bleeding|uncontrolled bleeding|severe bleeding|severe swelling|facial trauma|trouble breathing|saah)\b/i
 
 export function isEmergency(message: string): boolean {
   if (SCRIPT.some((pattern) => pattern.test(message))) return true

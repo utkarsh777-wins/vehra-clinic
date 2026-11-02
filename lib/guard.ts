@@ -66,13 +66,47 @@ export async function readJson(
   }
   const origin = request.headers.get("origin")
   if (origin) {
-    let expected = ""
+    let originHost = ""
     try {
-      expected = new URL(request.url).origin
+      originHost = new URL(origin).host.toLowerCase()
     } catch {
-      expected = ""
+      return { ok: false, status: 403, error: "Cross-origin requests are not accepted." }
     }
-    if (!expected || origin !== expected) {
+    const forwardedHost = request.headers.get("x-forwarded-host")
+    const hostHeader = request.headers.get("host")
+    const allowedEnv = (process.env.ALLOWED_ORIGINS || "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean)
+
+    let matched = false
+    if (forwardedHost) {
+      matched = forwardedHost
+        .split(",")
+        .map((h) => h.trim().toLowerCase())
+        .includes(originHost)
+    } else if (hostHeader) {
+      matched = hostHeader.trim().toLowerCase() === originHost
+    } else {
+      try {
+        matched = new URL(request.url).host.toLowerCase() === originHost
+      } catch {
+        matched = false
+      }
+    }
+
+    if (!matched && allowedEnv.length > 0) {
+      matched = allowedEnv.some((allowed) => {
+        if (allowed === origin.toLowerCase() || allowed === originHost) return true
+        try {
+          return new URL(allowed).host.toLowerCase() === originHost
+        } catch {
+          return false
+        }
+      })
+    }
+
+    if (!matched) {
       return { ok: false, status: 403, error: "Cross-origin requests are not accepted." }
     }
   }

@@ -18,6 +18,7 @@ export type StoredBooking = AppointmentRequest & {
   idempotencyKey?: string
   supersedes?: string
   supersededAt?: string
+  sessionToken?: string
 }
 
 export type SaveResult = {
@@ -31,6 +32,7 @@ export type SaveInput = AppointmentRequest & {
   language?: Locale
   idempotencyKey?: string
   supersedes?: string
+  sessionToken?: string
 }
 
 let chain: Promise<unknown> = Promise.resolve()
@@ -78,6 +80,7 @@ export async function saveBooking(input: SaveInput, now = new Date()): Promise<S
     language: input.language ?? "en",
     ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
     ...(input.supersedes ? { supersedes: input.supersedes } : {}),
+    ...(input.sessionToken ? { sessionToken: input.sessionToken } : {}),
   }
 
   const primary = resolveStorePath()
@@ -87,6 +90,7 @@ export async function saveBooking(input: SaveInput, now = new Date()): Promise<S
   try {
     saved = await appendBooking(primary, draft)
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Cannot supersede booking")) throw error
     if (path.resolve(/*turbopackIgnore: true*/ primary) === path.resolve(/*turbopackIgnore: true*/ fallback)) throw error
     saved = await appendBooking(fallback, draft)
     file = fallback
@@ -130,10 +134,19 @@ async function appendBooking(
       if (duplicate) return { booking: duplicate, replay: true }
     } else {
       const previous = existing.find((booking) => booking.id === draft.supersedes || booking.key === draft.supersedes)
-      if (previous && previous.status !== "superseded") {
-        previous.status = "superseded"
-        previous.supersededAt = draft.createdAt
+      if (!previous || previous.status === "superseded") {
+        throw new Error("Cannot supersede booking: booking not found or already superseded.")
       }
+      const sameSession = Boolean(draft.sessionToken && previous.sessionToken && draft.sessionToken === previous.sessionToken)
+      const samePhone = Boolean(draft.phone && previous.phone && draft.phone === previous.phone)
+      if (!sameSession && !samePhone) {
+        throw new Error("Cannot supersede booking: request must come from the same signed session or matching phone number.")
+      }
+      if (!draft.sessionToken && previous.sessionToken) {
+        draft.sessionToken = previous.sessionToken
+      }
+      previous.status = "superseded"
+      previous.supersededAt = draft.createdAt
     }
 
     const used = new Set(existing.map((booking) => booking.id))
