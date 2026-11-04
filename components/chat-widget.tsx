@@ -43,6 +43,12 @@ type FormState = {
 
 const EMPTY_FORM: FormState = { name: "", phone: "", date: "", time: "morning", reason: "", idempotencyKey: "" }
 
+const SUPERSEDE_PHONE_ERROR: Record<Locale, string> = {
+  en: "To change this booking, please call the clinic at +91 00000 00000.",
+  hi: "बुकिंग में बदलाव के लिए कृपया क्लिनिक को +91 00000 00000 पर कॉल करें।",
+  pa: "ਬੁਕਿੰਗ ਵਿੱਚ ਬਦਲਾਅ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਕਲੀਨਿਕ ਨੂੰ +91 00000 00000 'ਤੇ ਕਾਲ ਕਰੋ।",
+}
+
 function localAnswer(faqId: string | undefined, fallback: string, t: Messages, locale: string) {
   if (!faqId || locale === "en") return fallback
   const hours = `${t.doctors.rows[0][0]} ${t.doctors.rows[0][1]} / ${t.doctors.rows[0][2]}. ${t.doctors.rows[1][0]} ${t.doctors.rows[1][1]} / ${t.doctors.rows[1][2]}. ${t.doctors.sunday}: ${t.doctors.closed}`
@@ -267,6 +273,16 @@ export function ChatWidget() {
       }
       if (payload.field) {
         setForm((current) => ({ ...current, field: payload.field, error: payload.reply }))
+        return
+      }
+      if (
+        response.status === 400 &&
+        Boolean(currentForm.supersedes) &&
+        (payload.error?.includes("matching phone number") || payload.error?.includes("phone"))
+      ) {
+        const error = SUPERSEDE_PHONE_ERROR[locale] ?? SUPERSEDE_PHONE_ERROR.en
+        setForm((current) => ({ ...current, field: "phone", error }))
+        setBubbles((current) => [...current, { id: crypto.randomUUID(), kind: "bot", text: error }])
         return
       }
       if (!response.ok || !payload.booking) throw new Error(payload.error || "failed")

@@ -8,6 +8,7 @@ import { POST } from "@/app/api/chat/route"
 import { runAssistantTurn } from "@/lib/assistant"
 import { handleTurn, initialSession, parseName, preserveTime, validateAppointment } from "@/lib/booking"
 import { getClinic } from "@/lib/clinic"
+import { isEmergency } from "@/lib/emergency"
 import { resetGuards } from "@/lib/guard"
 import { openTodayLabel } from "@/lib/open-status"
 import { saveBooking } from "@/lib/store"
@@ -178,6 +179,7 @@ describe("emergencies", () => {
     ["broken jaw", "en"],
     ["hurt my jaw", "en"],
     ["knocked out tooth", "en"],
+    ["face is swelling up", "en"],
     // HI escalate
     ["बहुत तेज़ दर्द है", "hi"],
     ["दाँत में तेज़ दर्द है", "hi"],
@@ -192,6 +194,8 @@ describe("emergencies", () => {
     ["जबड़ा टूट गया", "hi"],
     ["सांस नहीं आ रही", "hi"],
     ["सांस लेने में तकलीफ", "hi"],
+    ["सांस नहीं ले पा रही", "hi"],
+    ["सांस लेने मे तकलीफ", "hi"],
     // PA escalate
     ["ਬਹੁਤ ਤੇਜ਼ ਦਰਦ ਹੈ", "pa"],
     ["ਤੇਜ਼ ਦਰਦ ਹੋ ਰਿਹਾ ਹੈ", "pa"],
@@ -204,11 +208,28 @@ describe("emergencies", () => {
     ["ਖੂਨ ਨਹੀਂ ਰੁਕ ਰਿਹਾ", "pa"],
     ["ਜਬਾੜੇ ਤੇ ਸੱਟ", "pa"],
     ["ਸਾਹ ਨਹੀਂ ਆ ਰਿਹਾ", "pa"],
+    ["ਸਾਹ ਲੈਣ ਵਿੱਚ ਤਕਲੀਫ", "pa"],
+    ["ਸਾਹ ਫੁੱਲ ਰਿਹਾ ਹੈ", "pa"],
+    ["ਸਾਹ ਨਹੀਂ ਆਉਂਦਾ", "pa"],
+    ["ਖੂਨ ਨਹੀਂ ਰੁਕਦਾ", "pa"],
+    ["ਨਿਗਲਣ ਵਿੱਚ ਤਕਲੀਫ", "pa"],
     // Romanised Hindi/Punjabi escalate
     ["bahut khoon beh raha hai", "hi"],
     ["khoon nahi ruk raha", "hi"],
     ["chehre pe sujan", "hi"],
     ["jabda toot gaya", "hi"],
+    ["saans nahin aa rahi", "hi"],
+    ["saans lene me takleef", "hi"],
+    ["saans phool rahi hai", "hi"],
+    ["khoon nahin ruk raha", "hi"],
+    ["nigal nahi pa raha", "hi"],
+    ["aankh tak soojan", "hi"],
+    ["mera chehra sooj gaya", "hi"],
+    // Bad breath + emergency escalate
+    ["bad breath and I can't breathe", "en"],
+    ["मुँह से बदबू आ रही है और साँस नहीं आ रही", "hi"],
+    ["ਮੂੰਹ ਵਿੱਚੋਂ ਬਦਬੂ ਅਤੇ ਖੂਨ ਨਹੀਂ ਰੁਕ ਰਿਹਾ", "pa"],
+    ["badboo hai aur khoon nahi ruk raha", "hi"],
   ])("escalates %s to 112 emergency path in %s", (message, lang) => {
     const locale = (lang as "en" | "hi" | "pa") || resolveLocale(message)
     const turn = say(message, { mode: "booking", step: "reason", draft: { name: "Ada Kaur" } }, locale)
@@ -225,6 +246,9 @@ describe("emergencies", () => {
     ["pain in my back molar", "en"],
     ["I have tooth pain", "en"],
     ["bleeding gums", "en"],
+    ["toothache", "en"],
+    ["bare pain", "en"],
+    ["bad breath", "en"],
     // HI non-escalate
     ["दाँत में दर्द है", "hi"],
     ["दर्द हो रहा है", "hi"],
@@ -237,12 +261,30 @@ describe("emergencies", () => {
     // Bad-breath non-escalate
     ["सांस की बदबू", "hi"],
     ["saans ki badboo", "hi"],
+    ["bad breath in the morning", "en"],
+    ["saans se badboo aati hai", "hi"],
+    ["ਸਾਹ ਵਿੱਚੋਂ ਬਦਬੂ ਆਉਂਦੀ ਹੈ", "pa"],
+    ["मेरी सास को दाँत में हल्का दर्द है", "hi"],
   ])("does NOT escalate plain pain or bleeding gums (%s) to 112, gives symptom reply", (message, lang) => {
     const locale = lang as "en" | "hi" | "pa"
     const turn = say(message, initialSession(), locale)
     expect(turn.reply).not.toMatch(/112/)
     expect(turn.reply).not.toMatch(/108/)
     expect(turn.reply).toBe(voice(locale).symptom)
+  })
+
+  it("properly classifies bad-breath and breath distress edge cases with isEmergency", () => {
+    // must escalate
+    expect(isEmergency("bad breath and I can't breathe")).toBe(true)
+    expect(isEmergency("मुँह से बदबू आ रही है और साँस नहीं आ रही")).toBe(true)
+    expect(isEmergency("ਮੂੰਹ ਵਿੱਚੋਂ ਬਦਬੂ ਅਤੇ ਖੂਨ ਨਹੀਂ ਰੁਕ ਰਿਹਾ")).toBe(true)
+    expect(isEmergency("badboo hai aur khoon nahi ruk raha")).toBe(true)
+
+    // must NOT escalate
+    expect(isEmergency("मेरी सास को दाँत में हल्का दर्द है")).toBe(false)
+    expect(isEmergency("bad breath in the morning")).toBe(false)
+    expect(isEmergency("saans se badboo aati hai")).toBe(false)
+    expect(isEmergency("ਸਾਹ ਵਿੱਚੋਂ ਬਦਬੂ ਆਉਂਦੀ ਹੈ")).toBe(false)
   })
 
   it("booking form accepts reason like 'दाँत में दर्द' without being blocked by emergency detection", async () => {
