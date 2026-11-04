@@ -3,8 +3,10 @@
 import { useEffect, useId, useRef, useState } from "react"
 
 import { addDays, clinicNow, formatClinicDate, formatTime, toIso } from "@/lib/calendar"
+import { preserveTime } from "@/lib/booking"
+import { isEmergency } from "@/lib/emergency"
 import { LanguageSwitch, useLocale } from "@/components/locale"
-import type { Messages } from "@/content/messages"
+import { messages, type Locale, type Messages } from "@/content/messages"
 
 type BookingCard = {
   id: string
@@ -17,7 +19,8 @@ type BookingCard = {
 }
 
 type Bubble =
-  | { id: string; kind: "me" | "bot" | "small" | "error"; text: string }
+  | { id: string; kind: "me" | "bot" | "small"; text: string }
+  | { id: string; kind: "error"; text: string; retryForm?: FormState }
   | { id: string; kind: "confirm"; booking: BookingCard }
 
 type Session = {
@@ -30,21 +33,21 @@ type FormState = {
   name: string
   phone: string
   date: string
-  time: "morning" | "evening"
+  time: string
   reason: string
   field?: string
   error?: string
+  idempotencyKey: string
+  supersedes?: string
 }
 
-const EMPTY_FORM: FormState = { name: "", phone: "", date: "", time: "morning", reason: "" }
+const EMPTY_FORM: FormState = { name: "", phone: "", date: "", time: "morning", reason: "", idempotencyKey: "" }
 
-const ENGLISH_CHIPS = [
-  "Book an appointment",
-  "Are you open today?",
-  "How much is a cleaning?",
-  "Do you see children?",
-  "Where do I park?",
-]
+const SUPERSEDE_PHONE_ERROR: Record<Locale, string> = {
+  en: "To change this booking, please call the clinic at +91 00000 00000.",
+  hi: "बुकिंग में बदलाव के लिए कृपया क्लिनिक को +91 00000 00000 पर कॉल करें।",
+  pa: "ਬੁਕਿੰਗ ਵਿੱਚ ਬਦਲਾਅ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਕਲੀਨਿਕ ਨੂੰ +91 00000 00000 'ਤੇ ਕਾਲ ਕਰੋ।",
+}
 
 function localAnswer(faqId: string | undefined, fallback: string, t: Messages, locale: string) {
   if (!faqId || locale === "en") return fallback
@@ -52,7 +55,7 @@ function localAnswer(faqId: string | undefined, fallback: string, t: Messages, l
   const known: Record<string, string> = {
     hours,
     "walk-in": t.faq.items[0][1],
-    fees: t.faq.items[1][1],
+    fees: t.chat.feeAnswer,
     children: t.faq.items[2][1],
     bring: t.faq.items[3][1],
     payment: t.faq.items[4][1],
@@ -62,7 +65,7 @@ function localAnswer(faqId: string | undefined, fallback: string, t: Messages, l
     doctors: `${t.doctors.people.map((person) => `${person[0]} (${person[2]})`).join(". ")}. ${t.doctors.lede}`,
     services: t.services.items.map((item) => item[0]).join(", "),
     languages: t.why.items[3][1],
-    demo: t.demoBar,
+    sample: t.sampleBar,
     contact: `${t.visit.phone} ${"+91 00000 00000"}. ${t.visit.flag}`,
   }
   return known[faqId] ?? fallback
@@ -89,6 +92,8 @@ export function ChatWidget() {
   const [offline, setOffline] = useState(false)
   const [draft, setDraft] = useState("")
   const [session, setSession] = useState<Session | null>(null)
+  const [sessionToken, setSessionToken] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [preview, setPreview] = useState<string | null>(null)
   const [shot, setShot] = useState(false)
@@ -97,6 +102,7 @@ export function ChatWidget() {
   const launchRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLElement>(null)
   const queue = useRef<string[]>([])
+  const busy = useRef(false)
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -156,15 +162,17 @@ export function ChatWidget() {
   function beginForm(prefill?: Partial<FormState>) {
     setChipsOn(false)
     setFormOn(true)
-    setForm({ ...EMPTY_FORM, ...prefill })
+    setSubmitting(false)
+    setForm({ ...EMPTY_FORM, idempotencyKey: crypto.randomUUID(), ...prefill })
     setSuggestions([])
   }
 
   async function send(message: string) {
     const text = message.trim()
-    if (!text) return
-    if (/[\u0A00-\u0A7F]/.test(text)) setLocale("pa")
-    else if (/[\u0900-\u097F]/.test(text)) setLocale("hi")
+    if (!text || busy.current) return
+    busy.current = true
+    const replyLocale: Locale = /[\u0A00-\u0A7F]/.test(text) ? "pa" : /[\u0900-\u097F]/.test(text) ? "hi" : locale
+    if (replyLocale !== locale) setLocale(replyLocale)
     setPreview(null)
     setChipsOn(false)
     setFormOn(false)
@@ -173,6 +181,7 @@ export function ChatWidget() {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       queue.current.push(text)
       setOffline(true)
+      busy.current = false
       return
     }
     const started = Date.now()
@@ -188,12 +197,13 @@ export function ChatWidget() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: text, session }),
+        body: JSON.stringify({ message: text, session, sessionToken, locale: replyLocale }),
         signal: controller.signal,
       })
       const payload = (await response.json()) as {
         reply?: string
         session?: Session
+        sessionToken?: string
         suggestions?: string[]
         faqId?: string
         booking?: BookingCard | null
@@ -203,8 +213,9 @@ export function ChatWidget() {
       const wait = shownAt ? Math.max(0, 400 - (Date.now() - shownAt)) : 0
       if (wait) await new Promise((resolve) => window.setTimeout(resolve, wait))
       setSession(payload.session ?? null)
+      setSessionToken(payload.sessionToken ?? null)
       setSuggestions(payload.suggestions ?? [])
-      const reply = localAnswer(payload.faqId, payload.reply, t, locale)
+      const reply = localAnswer(payload.faqId, payload.reply, messages[replyLocale], replyLocale)
       setBubbles((current) => [
         ...current,
         { id: crypto.randomUUID(), kind: "bot", text: reply },
@@ -220,16 +231,20 @@ export function ChatWidget() {
       window.clearTimeout(failTimer)
       setTyping(false)
       setSlow(false)
+      busy.current = false
       if (Date.now() - started < 0) setTyping(false)
     }
   }
 
-  async function submitForm(event: React.FormEvent) {
-    event.preventDefault()
+  async function submitForm(event?: React.FormEvent, snapshot?: FormState) {
+    event?.preventDefault()
+    if (submitting) return
     if (preview === "book") {
       setPreview("done")
       return
     }
+    const currentForm = snapshot ?? form
+    setSubmitting(true)
     setForm((current) => ({ ...current, error: undefined, field: undefined }))
     try {
       const response = await fetch("/api/chat", {
@@ -238,7 +253,16 @@ export function ChatWidget() {
         body: JSON.stringify({
           intent: "submit_booking",
           message: "",
-          draft: { name: form.name, phone: form.phone, date: form.date, time: form.time, reason: form.reason },
+          locale,
+          idempotencyKey: currentForm.idempotencyKey,
+          supersedes: currentForm.supersedes,
+          draft: {
+            name: currentForm.name,
+            phone: currentForm.phone,
+            date: currentForm.date,
+            time: currentForm.time,
+            reason: currentForm.reason,
+          },
         }),
       })
       const payload = (await response.json()) as {
@@ -251,6 +275,16 @@ export function ChatWidget() {
         setForm((current) => ({ ...current, field: payload.field, error: payload.reply }))
         return
       }
+      if (
+        response.status === 400 &&
+        Boolean(currentForm.supersedes) &&
+        (payload.error?.includes("matching phone number") || payload.error?.includes("phone"))
+      ) {
+        const error = SUPERSEDE_PHONE_ERROR[locale] ?? SUPERSEDE_PHONE_ERROR.en
+        setForm((current) => ({ ...current, field: "phone", error }))
+        setBubbles((current) => [...current, { id: crypto.randomUUID(), kind: "bot", text: error }])
+        return
+      }
       if (!response.ok || !payload.booking) throw new Error(payload.error || "failed")
       const booking = payload.booking
       setFormOn(false)
@@ -261,21 +295,23 @@ export function ChatWidget() {
           kind: "me",
           text: `${booking.name} · ${booking.phone.slice(0, 5)} ${booking.phone.slice(5)}\n${formatClinicDate(booking.date)} · ${formatTime(booking.time)}${booking.reason ? ` · ${booking.reason}` : ""}`,
         },
-        { id: crypto.randomUUID(), kind: "bot", text: `${booking.name}. ${t.chat.thanks}` },
+        { id: crypto.randomUUID(), kind: "bot", text: t.chat.thanksYou.replace("{name}", booking.name) },
         { id: crypto.randomUUID(), kind: "confirm", booking },
       ])
     } catch {
-      setBubbles((current) => [...current, { id: crypto.randomUUID(), kind: "error", text: form.name }])
+      setBubbles((current) => [...current, { id: crypto.randomUUID(), kind: "error", text: t.chat.error, retryForm: currentForm }])
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  function onChip(index: number) {
-    if (ENGLISH_CHIPS[index] === "Book an appointment") {
+  function onChip(label: string, index: number) {
+    if (index === 0) {
       setPreview(null)
       beginForm()
       return
     }
-    void send(ENGLISH_CHIPS[index] ?? t.chat.chips[index])
+    void send(label)
   }
 
   const previewBook = preview === "book" || preview === "done"
@@ -356,7 +392,7 @@ export function ChatWidget() {
                   key={label}
                   className={index === 0 ? "chip chip--primary" : "chip"}
                   type="button"
-                  onClick={() => onChip(index)}
+                  onClick={() => onChip(label, index)}
                 >
                   {label}
                 </button>
@@ -381,7 +417,8 @@ export function ChatWidget() {
                 form={form}
                 setForm={setForm}
                 onSubmit={submitForm}
-                disabled={offline}
+                disabled={offline || submitting}
+                submitting={submitting}
               />
             </div>
           )}
@@ -392,11 +429,21 @@ export function ChatWidget() {
                 name: bubble.booking.name,
                 phone: bubble.booking.phone,
                 date: bubble.booking.date,
-                time: bubble.booking.time === "evening" ? "evening" : "morning",
+                time: preserveTime(bubble.booking.time),
                 reason: bubble.booking.reason,
+                supersedes: bubble.booking.id,
+                idempotencyKey: crypto.randomUUID(),
               })} onElse={() => { setFormOn(false); setChipsOn(true); setSuggestions([]) }} />
             ) : bubble.kind === "error" ? (
-              <ErrorBubble key={bubble.id} t={t} onRetry={() => void send(bubble.text)} />
+              <ErrorBubble key={bubble.id} t={t} onRetry={() => {
+                if (bubble.retryForm) {
+                  setForm(bubble.retryForm)
+                  setFormOn(true)
+                  void submitForm(undefined, bubble.retryForm)
+                  return
+                }
+                void send(bubble.text)
+              }} />
             ) : (
               <div key={bubble.id} className={bubble.kind === "me" ? "msg msg--me" : bubble.kind === "small" ? "msg msg--bot msg--small" : "msg msg--bot"}>
                 <p style={{ whiteSpace: "pre-wrap" }}>{bubble.text}</p>
@@ -501,10 +548,11 @@ function ConfirmCard({
         {formatClinicDate(booking.date)} · {formatTime(booking.time)}
       </p>
       <p>
-        {t.chat.callLine} <strong>+91 {phone}</strong> {t.chat.until}
+        {t.chat.callLine.replace("{phone}", `+91 ${phone}`)}
+        {t.chat.until ? ` ${t.chat.until}` : ""}
       </p>
       <p className="confirm__ref">
-        Reference {booking.id} · {booking.webhook === "sent" ? "sent to the clinic sheet" : t.chat.notSent}
+        {t.chat.reference} {booking.id} · {booking.webhook === "sent" ? t.chat.sent : t.chat.notSent}
       </p>
       <div className="confirm__acts">
         <button className="chip" type="button" onClick={onChange}>
@@ -524,12 +572,14 @@ function RequestForm({
   setForm,
   onSubmit,
   disabled,
+  submitting,
 }: {
   t: Messages
   form: FormState
   setForm: React.Dispatch<React.SetStateAction<FormState>>
   onSubmit: (event: React.FormEvent) => void
   disabled?: boolean
+  submitting?: boolean
 }) {
   return (
     <form className="req" aria-label={t.chat.formTitle} onSubmit={onSubmit}>
@@ -577,8 +627,11 @@ function RequestForm({
           <select
             value={form.time}
             aria-invalid={form.field === "time"}
-            onChange={(event) => setForm({ ...form, time: event.target.value === "evening" ? "evening" : "morning" })}
+            onChange={(event) => setForm({ ...form, time: event.target.value })}
           >
+            {form.time !== "morning" && form.time !== "evening" ? (
+              <option value={form.time}>{formatTime(form.time)}</option>
+            ) : null}
             <option value="morning">{t.chat.morning}</option>
             <option value="evening">{t.chat.evening}</option>
           </select>
@@ -588,6 +641,11 @@ function RequestForm({
         <span>
           {t.chat.reason} <span className="opt">{t.chat.optional}</span>
         </span>
+        {isEmergency(form.reason) ? (
+          <p className="field-error" role="status" style={{ margin: "4px 0", fontSize: "0.85rem" }}>
+            {t.chat.emergency}
+          </p>
+        ) : null}
         <input
           maxLength={120}
           placeholder={t.chat.reasonPh}
@@ -597,7 +655,7 @@ function RequestForm({
         />
       </label>
       {form.error ? <p className="field-error">{form.error}</p> : null}
-      <button className="btn btn--primary btn--block" type="submit" disabled={disabled}>
+      <button className="btn btn--primary btn--block" type="submit" disabled={disabled || submitting}>
         {t.chat.sendRequest}
       </button>
       <p className="req__fine">{t.chat.fine}</p>
@@ -666,13 +724,11 @@ function PreviewFlow({ t, done, onSend }: { t: Messages; done: boolean; onSend: 
           <div className="confirm" role="status">
             <p className="confirm__k">
               <span className="dot dot--wait" aria-hidden="true" />
-              Request received, not yet confirmed
+              {t.chat.received}
             </p>
             <p className="confirm__v">Sat, 7 Nov · Morning</p>
-            <p>
-              The desk will call <strong>+91 98765 43210</strong> to confirm an exact time. Until then, this isn’t a booked appointment.
-            </p>
-            <p className="confirm__ref">Reference VH-0142 · demo, not sent</p>
+            <p>{t.chat.callLine.replace("{phone}", "+91 98765 43210")}</p>
+            <p className="confirm__ref">{t.chat.reference} VH-0142 · {t.chat.notSent}</p>
             <div className="confirm__acts">
               <button className="chip" type="button">
                 Change details

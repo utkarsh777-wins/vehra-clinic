@@ -35,8 +35,9 @@ describe("matchFaq", () => {
   it("names the fictional doctors", () => {
     const match = matchFaq("Who are the doctors?", clinic)
     expect(match?.id).toBe("doctors")
-    expect(match?.answer).toContain("Simran Kaur")
-    expect(match?.answer.toLowerCase()).toContain("fictional")
+    expect(match?.answer).toContain("Dentist (placeholder)")
+    expect(match?.answer).toContain("General physician (placeholder)")
+    expect(match?.answer).not.toMatch(/BDS|MBBS/)
   })
 
   it("answers languages and contact", () => {
@@ -46,7 +47,7 @@ describe("matchFaq", () => {
 
   it("says the clinic is fictional", () => {
     const match = matchFaq("Is this a real clinic?", clinic)
-    expect(match?.id).toBe("demo")
+    expect(match?.id).toBe("sample")
     expect(match?.answer.toLowerCase()).toContain("fictional")
   })
 

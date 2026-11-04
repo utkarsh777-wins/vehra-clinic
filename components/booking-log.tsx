@@ -13,6 +13,7 @@ type Row = {
   time: string
   reason: string
   createdAt: string
+  status?: string
   webhook?: string
 }
 
@@ -32,12 +33,12 @@ export function BookingLog() {
       const payload = (await response.json()) as { bookings?: Row[]; error?: string }
       if (!response.ok) {
         setRows(null)
-        setError(payload.error || "The demo log could not be read.")
+        setError(payload.error || t.log.error)
         return
       }
       setRows(payload.bookings ?? [])
     } catch {
-      setError("The demo log could not be read.")
+      setError(t.log.error)
     } finally {
       setLoading(false)
     }
@@ -45,7 +46,7 @@ export function BookingLog() {
 
   return (
     <div className="wrap" style={{ maxWidth: 760 }}>
-      <p className="eyebrow">Demo</p>
+      <p className="eyebrow">Sample site</p>
       <h1 className="h2">{t.log.title}</h1>
       <p className="sec-head__p" style={{ marginTop: 16 }}>
         {t.log.lede}
@@ -71,11 +72,11 @@ export function BookingLog() {
       {rows && rows.length === 0 ? <p style={{ marginTop: 24 }}>{t.log.empty}</p> : null}
       {rows && rows.length > 0 ? (
         <div style={{ display: "grid", gap: 16, marginTop: 28 }}>
-          {rows.map((row) => (
+          {rows.filter((row) => row.status !== "superseded").map((row) => (
             <article key={row.id} className="confirm">
               <p className="confirm__k">
                 <span className="dot dot--wait" aria-hidden="true" />
-                Request received, not yet confirmed
+                {t.chat.received}
               </p>
               <p className="confirm__v">
                 {formatClinicDate(row.date)} · {formatTime(row.time)}

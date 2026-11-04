@@ -1,20 +1,36 @@
-import { randomBytes } from "crypto"
+import { createHmac, randomBytes, randomUUID } from "crypto"
 import { mkdir, readFile, rename, writeFile } from "fs/promises"
 import path from "path"
 
 import type { AppointmentRequest } from "@/lib/booking"
+import type { Locale } from "@/lib/voice"
+
+const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 export type StoredBooking = AppointmentRequest & {
+  key: string
   id: string
   createdAt: string
   source: "chat"
-  demo: true
+  sample: true
+  status: "active" | "superseded"
+  language: Locale
+  idempotencyKey?: string
+  supersedes?: string
+  supersededAt?: string
 }
 
 export type SaveResult = {
   booking: StoredBooking
   file: string
   webhook: "skipped" | "sent" | "failed"
+  replay: boolean
+}
+
+export type SaveInput = AppointmentRequest & {
+  language?: Locale
+  idempotencyKey?: string
+  supersedes?: string
 }
 
 let chain: Promise<unknown> = Promise.resolve()
@@ -39,9 +55,17 @@ export function defaultFallbackPath(): string {
   return process.env.BOOKINGS_FALLBACK_PATH?.trim() || "/tmp/vehra-bookings.json"
 }
 
-export async function saveBooking(input: AppointmentRequest, now = new Date()): Promise<SaveResult> {
-  const booking: StoredBooking = {
-    id: `VH-${String((now.getTime() + randomBytes(2).readUInt16BE(0)) % 10000).padStart(4, "0")}`,
+function publicRef(): string {
+  const bytes = randomBytes(8)
+  let out = ""
+  for (let index = 0; index < 8; index += 1) {
+    out += ALPHABET[bytes[index] % ALPHABET.length]
+  }
+  return `VH-${out}`
+}
+
+export async function saveBooking(input: SaveInput, now = new Date()): Promise<SaveResult> {
+  const draft: Omit<StoredBooking, "key" | "id"> = {
     name: input.name,
     phone: input.phone,
     date: input.date,
@@ -49,22 +73,29 @@ export async function saveBooking(input: AppointmentRequest, now = new Date()): 
     reason: input.reason,
     createdAt: now.toISOString(),
     source: "chat",
-    demo: true,
+    sample: true,
+    status: "active",
+    language: input.language ?? "en",
+    ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : {}),
+    ...(input.supersedes ? { supersedes: input.supersedes } : {}),
   }
 
   const primary = resolveStorePath()
   const fallback = defaultFallbackPath()
   let file = primary
+  let saved: { booking: StoredBooking; replay: boolean }
   try {
-    await appendBooking(primary, booking)
+    saved = await appendBooking(primary, draft)
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Cannot supersede booking")) throw error
     if (path.resolve(/*turbopackIgnore: true*/ primary) === path.resolve(/*turbopackIgnore: true*/ fallback)) throw error
-    await appendBooking(fallback, booking)
+    saved = await appendBooking(fallback, draft)
     file = fallback
   }
 
-  const webhook = await postWebhook(booking)
-  return { booking, file, webhook }
+  if (saved.replay) return { booking: saved.booking, file, webhook: "skipped", replay: true }
+  const webhook = await postWebhook(saved.booking)
+  return { booking: saved.booking, file, webhook, replay: false }
 }
 
 export async function listBookings(): Promise<StoredBooking[]> {
@@ -76,14 +107,51 @@ export async function listBookings(): Promise<StoredBooking[]> {
   return (await readList(fallback)) ?? []
 }
 
-async function appendBooking(file: string, booking: StoredBooking): Promise<void> {
-  await withLock(async () => {
+async function appendBooking(
+  file: string,
+  draft: Omit<StoredBooking, "key" | "id">,
+): Promise<{ booking: StoredBooking; replay: boolean }> {
+  return withLock(async () => {
     await mkdir(path.dirname(file), { recursive: true })
     const existing = (await readList(file)) ?? []
+    if (draft.idempotencyKey) {
+      const prior = existing.find((booking) => booking.idempotencyKey === draft.idempotencyKey)
+      if (prior) return { booking: prior, replay: true }
+    }
+    if (!draft.supersedes) {
+      const duplicate = existing.find(
+        (booking) =>
+          booking.status !== "superseded" &&
+          booking.name === draft.name &&
+          booking.phone === draft.phone &&
+          booking.date === draft.date &&
+          booking.time === draft.time &&
+          booking.reason === draft.reason,
+      )
+      if (duplicate) return { booking: duplicate, replay: true }
+    } else {
+      const previous = existing.find((booking) => booking.id === draft.supersedes || booking.key === draft.supersedes)
+      if (!previous || previous.status === "superseded") {
+        throw new Error("Cannot supersede booking: booking not found or already superseded.")
+      }
+      const draftPhone = (draft.phone ?? "").replace(/\D/g, "")
+      const prevPhone = (previous.phone ?? "").replace(/\D/g, "")
+      if (!draftPhone || draftPhone !== prevPhone) {
+        throw new Error("Cannot supersede booking: request must come from matching phone number.")
+      }
+      previous.status = "superseded"
+      previous.supersededAt = draft.createdAt
+    }
+
+    const used = new Set(existing.map((booking) => booking.id))
+    let id = publicRef()
+    while (used.has(id)) id = publicRef()
+    const booking: StoredBooking = { ...draft, key: randomUUID(), id }
     existing.push(booking)
     const temporary = `${file}.${process.pid}.tmp`
     await writeFile(temporary, JSON.stringify(existing, null, 2))
     await rename(temporary, file)
+    return { booking, replay: false }
   })
 }
 
@@ -105,11 +173,17 @@ async function readList(file: string): Promise<StoredBooking[] | null> {
 async function postWebhook(booking: StoredBooking): Promise<"skipped" | "sent" | "failed"> {
   const url = process.env.BOOKING_WEBHOOK_URL?.trim()
   if (!url) return "skipped"
+  const body = JSON.stringify(booking)
+  const headers: Record<string, string> = { "content-type": "application/json" }
+  const secret = process.env.BOOKING_WEBHOOK_SECRET?.trim()
+  if (secret) {
+    headers["x-vehra-signature"] = `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`
+  }
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(booking),
+      headers,
+      body,
       signal: AbortSignal.timeout(8000),
       redirect: "error",
     })

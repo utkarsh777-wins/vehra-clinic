@@ -13,12 +13,12 @@
 export const brand = {
   name: "Vehra Dental & Family Clinic",
   shortName: "Vehra",
-  demoLabel: "Demo, fictional business",
+  sampleLabel: "Sample site",
   city: "Phagwara",
   region: "Punjab",
   tagline: "Care that takes its time.",
   description:
-    "Demo website for a fictional dental and family clinic in Phagwara, Punjab. It does not provide medical care.",
+    "Sample site for a fictional dental and family clinic in Phagwara, Punjab. It does not provide medical care.",
   fonts: {
     display: "Fraunces",
     body: "Instrument Sans",

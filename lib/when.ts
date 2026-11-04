@@ -56,7 +56,7 @@ export function parseWhen(
   partial?: { date?: string; time?: string },
 ): WhenResult {
   const extracted = extractDateAndTime(input, now, hours.timezone)
-  if (extracted.error && !extracted.date && !extracted.time) {
+  if (extracted.error) {
     return { status: "invalid", message: extracted.error }
   }
 
@@ -86,44 +86,56 @@ export function parseWhen(
   }
 
   const problem = validateSlot(date, time, now, hours)
-  if (problem) return { status: "invalid", message: problem }
+  if (problem) return { status: "invalid", message: problem.message }
   return { status: "complete", date, time }
 }
 
-export function validateSlot(date: string, time: string, now: Date, hours: ClinicHours): string | null {
+export type SlotIssue = { field: "date" | "time"; message: string }
+
+const DATE_MISSING = "That date doesn't exist. Please choose a real calendar date."
+
+export function validateSlot(date: string, time: string, now: Date, hours: ClinicHours): SlotIssue | null {
+  const [year, month, day] = date.split("-").map(Number)
+  if (!isRealDate(year, month, day)) {
+    return { field: "date", message: DATE_MISSING }
+  }
   const today = clinicNow(now, hours.timezone)
   const todayIso = toIso(today)
   const latest = toIso(addDays(today, 30))
   if (date < todayIso) {
-    return "That date has already passed. Please choose today or a later day."
+    return { field: "date", message: "That date has already passed. Please choose today or a later day." }
   }
   if (date > latest) {
-    return "Please choose a date within the next 30 days."
+    return { field: "date", message: "Please choose a date within the next 30 days." }
   }
   const weekday = fromIso(date).weekday
   const slots = slotsForWeekday(hours, weekday)
   if (slots.length === 0) {
-    return `The clinic is closed that day. ${hours.lines.join(" ")}`
+    return { field: "date", message: `The clinic is closed that day. ${hours.lines.join(" ")}` }
   }
   if (time === "morning" || time === "evening") {
     const session = slots.filter((slot) =>
       time === "morning" ? timeToMinutes(slot.start) < 14 * 60 : timeToMinutes(slot.start) >= 16 * 60,
     )
     if (session.length === 0) {
-      return `That session is not open that day. ${hours.lines.join(" ")}`
+      return { field: "time", message: `That session is not open that day. ${hours.lines.join(" ")}` }
     }
     if (date === todayIso && session.every((slot) => today.minutes >= timeToMinutes(slot.end))) {
-      return "That time has already passed today. Please choose a later time."
+      return { field: "time", message: "That time has already passed today. Please choose a later time." }
     }
     return null
+  }
+  const [hour, minute] = time.split(":").map(Number)
+  if (hour > 23 || minute > 59) {
+    return { field: "time", message: "That time doesn't look right. Try 10:30 am or 4:30 pm." }
   }
   const minutes = timeToMinutes(time)
   const inside = slots.some((slot) => minutes >= timeToMinutes(slot.start) && minutes < timeToMinutes(slot.end))
   if (!inside) {
-    return `That time is outside clinic hours. ${hours.lines.join(" ")}`
+    return { field: "time", message: `That time is outside clinic hours. ${hours.lines.join(" ")}` }
   }
   if (date === todayIso && minutes <= today.minutes) {
-    return "That time has already passed today. Please choose a later time."
+    return { field: "time", message: "That time has already passed today. Please choose a later time." }
   }
   return null
 }
@@ -146,8 +158,22 @@ function extractDateAndTime(
   return { date: date.date, time: time.time }
 }
 
+const MULTI_TIME = "I heard more than one time. Please send just one, for example 10:30 am."
+
 function extractTime(input: string): { time?: string; rest: string; error?: string } {
-  const ampm = input.match(/\b(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b/i)
+  const ampms = [...input.matchAll(/\b(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b/gi)]
+  const clocks = [...input.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)].filter((clock) => {
+    const start = clock.index ?? 0
+    return !ampms.some((ampm) => {
+      const at = ampm.index ?? 0
+      return start >= at && start < at + ampm[0].length
+    })
+  })
+  if (ampms.length + clocks.length > 1) {
+    return { rest: input, error: MULTI_TIME }
+  }
+
+  const ampm = ampms[0]
   if (ampm) {
     let hour = Number(ampm[1])
     const minute = ampm[2] ? Number(ampm[2]) : 0
@@ -160,7 +186,7 @@ function extractTime(input: string): { time?: string; rest: string; error?: stri
     return { time: formatHHMM(hour, minute), rest: input.replace(ampm[0], " ") }
   }
 
-  const hm = input.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/)
+  const hm = clocks[0]
   if (hm) {
     return {
       time: formatHHMM(Number(hm[1]), Number(hm[2])),
@@ -168,11 +194,11 @@ function extractTime(input: string): { time?: string; rest: string; error?: stri
     }
   }
 
-  if (/\bmorning\b/i.test(input)) {
-    return { time: "morning", rest: input.replace(/\bmorning\b/i, " ") }
+  if (mentions(input, ["morning", "subah", "सुबह", "ਸਵੇਰ"])) {
+    return { time: "morning", rest: stripWords(input, ["morning", "subah", "सुबह", "ਸਵੇਰ"]) }
   }
-  if (/\bevening\b/i.test(input)) {
-    return { time: "evening", rest: input.replace(/\bevening\b/i, " ") }
+  if (mentions(input, ["evening", "shaam", "शाम", "ਸ਼ਾਮ"])) {
+    return { time: "evening", rest: stripWords(input, ["evening", "shaam", "शाम", "ਸ਼ਾਮ"]) }
   }
 
   return { rest: input }
@@ -188,9 +214,12 @@ function extractDate(
 
   const today = clinicNow(now, timeZone)
 
-  if (/\btoday\b/.test(text)) return { date: toIso(today) }
+  if (mentions(text, ["yesterday"])) {
+    return { error: "That date has already passed. Please choose today or a later day." }
+  }
+  if (/\btoday\b/.test(text) || text.includes("आज") || text.includes("ਅੱਜ")) return { date: toIso(today) }
   if (/\bday after tomorrow\b/.test(text)) return { date: toIso(addDays(today, 2)) }
-  if (/\btomorrow\b/.test(text)) return { date: toIso(addDays(today, 1)) }
+  if (mentions(text, ["tomorrow", "kal", "कल", "ਭਲਕੇ", "ਕੱਲ੍ਹ"])) return { date: toIso(addDays(today, 1)) }
 
   const nextWeekday = text.match(
     new RegExp(`\\bnext\\s+(${WEEKDAYS.join("|")})\\b`),
@@ -241,6 +270,20 @@ function inferYear(today: CalendarDate, day: number, month: number): number {
   const thisYear = dateOrError(today.year, month, day)
   if (!("error" in thisYear) && thisYear.date && thisYear.date >= toIso(today)) return today.year
   return today.year + 1
+}
+
+function mentions(text: string, words: string[]): boolean {
+  return words.some((word) => {
+    if (/[^\u0000-\u007f]/.test(word)) return text.includes(word)
+    return new RegExp(`\\b${word}\\b`, "i").test(text)
+  })
+}
+
+function stripWords(input: string, words: string[]): string {
+  return words.reduce((rest, word) => {
+    if (/[^\u0000-\u007f]/.test(word)) return rest.split(word).join(" ")
+    return rest.replace(new RegExp(`\\b${word}\\b`, "ig"), " ")
+  }, input)
 }
 
 function dateOrError(year: number, month: number, day: number): { date?: string; error?: string } {

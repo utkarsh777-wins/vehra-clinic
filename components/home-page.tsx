@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 
 import { HeroArch } from "@/components/hero-arch"
 import { LanguageSwitch, openChat, useLocale } from "@/components/locale"
 import { ArrowIcon, ServiceIcon } from "@/components/service-icons"
+import { getClinic } from "@/lib/clinic"
+import { openTodayLabel } from "@/lib/open-status"
 
 const PHONE_TEL = "tel:+910000000000"
 const PHONE_LABEL = "+91 00000 00000"
@@ -119,15 +121,18 @@ export function HomePage({ whatsappHref }: { whatsappHref: string }) {
         <section className="hero" aria-labelledby="hero-h">
           <div className="wrap hero__grid">
             <div className="hero__copy">
-              <p className="tag">
-                <span aria-hidden="true">●</span> {t.hero.tag}
-              </p>
               <p className="eyebrow">{t.hero.eyebrow}</p>
               <h1 id="hero-h" className="display">
-                <span className="line">{t.hero.line1}</span>{" "}
-                <span className="line">
-                  {t.hero.line2} <em>{t.hero.em}</em>.
-                </span>
+                {t.hero.line2 ? (
+                  <>
+                    <span className="line">{t.hero.line1}</span>{" "}
+                    <span className="line">
+                      {t.hero.line2} <em>{t.hero.em}</em>.
+                    </span>
+                  </>
+                ) : (
+                  <span className="line">{t.hero.line1}</span>
+                )}
               </h1>
               <p className="lede">{t.hero.lede}</p>
               <div className="hero__ctas">
@@ -153,10 +158,7 @@ export function HomePage({ whatsappHref }: { whatsappHref: string }) {
               <HeroArch title={t.hero.illTitle} desc={t.hero.illDesc} />
               <figcaption className="hero__card">
                 <span className="hero__card-k">{t.hero.sample}</span>
-                <span className="hero__card-v">
-                  <span className="dot dot--open" aria-hidden="true" />
-                  {t.hero.openUntil}
-                </span>
+                <HeroHours />
               </figcaption>
             </figure>
           </div>
@@ -199,9 +201,7 @@ export function HomePage({ whatsappHref }: { whatsappHref: string }) {
                     {initials}
                   </div>
                   <div>
-                    <h3>
-                      {name} <span className="ph">placeholder</span>
-                    </h3>
+                    <h3>{name}</h3>
                     <p className="person__role">{role}</p>
                     <p className="person__note">{note}</p>
                     <p className="person__lang">{languages}</p>
@@ -411,11 +411,28 @@ export function HomePage({ whatsappHref }: { whatsappHref: string }) {
         </div>
         <div className="wrap foot__legal">
           <p>
-            <strong>Demo, fictional business.</strong> {t.footer.legal}
+            {t.footer.legal}
           </p>
           <p>{t.footer.credit}</p>
         </div>
       </footer>
     </>
+  )
+}
+
+function HeroHours() {
+  const { locale } = useLocale()
+  const [status, setStatus] = useState<{ closed: boolean; label: string } | null>(null)
+  useEffect(() => {
+    // The clock is read after mount so the prerender does not bake in a build-time instant.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setStatus(openTodayLabel(new Date(), locale, getClinic().hours))
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [locale])
+  return (
+    <span className="hero__card-v">
+      <span className={status?.closed === false ? "dot dot--open" : "dot dot--off"} aria-hidden="true" />
+      {status?.label ?? "…"}
+    </span>
   )
 }
