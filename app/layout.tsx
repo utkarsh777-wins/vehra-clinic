@@ -104,6 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       data-theme="light"
       className={`${fraunces.variable} ${instrument.variable} ${mukta.variable} ${mahee.variable}`}
+      suppressHydrationWarning
     >
       <body>
         <Script id="vehra-theme" strategy="beforeInteractive">
