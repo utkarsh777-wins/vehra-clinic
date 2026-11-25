@@ -345,15 +345,33 @@ details p{padding:0 0 var(--s-6);color:var(--fg-2);max-width:62ch}
   .chat__head{padding-top:var(--s-4)}
   @keyframes pop-in{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
 }
-@media (min-width:1600px){.chat{width:420px;right:32px;bottom:32px}}
+/* Keep the hero "Open today" caption clear of the open panel. */
+@media (min-width:1280px){
+  .chat{width:360px}
+  .hero__card{left:calc(-12px - max(0px, 96px - (100vw - 1280px) * 0.45))}
+}
+@media (min-width:1600px){
+  .chat{width:clamp(360px, calc(100vw - 1280px), 400px);right:32px;bottom:32px}
+}
 @media (prefers-reduced-motion:reduce){.chat{animation:none}.msg--typing span{animation:none;opacity:.6}}
 .nw{white-space:nowrap}
 
 [data-theme="dark"] .hero-svg{filter:brightness(.9) saturate(.95)}
 @media (max-width:359px){.brand__sub{display:none}}
 @media (max-width:599px){
-  .chat-launch{width:56px;height:56px;min-height:56px;padding:0;justify-content:center}
+  .chat-launch{
+    width:44px;height:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;
+    right:max(12px, env(safe-area-inset-right));
+    bottom:max(12px, env(safe-area-inset-bottom));
+  }
   .chat-launch span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .wrap{
+    --launcher-clear:calc(44px + 12px + 16px);
+    width:min(100% - var(--page-x) - var(--launcher-clear), var(--wrap));
+    margin-left:var(--page-x);
+    margin-right:var(--launcher-clear);
+  }
+  body{padding-bottom:calc(44px + 12px + 20px)}
 }
 .hero-ctas-visible .chat-launch{opacity:0;transform:translateY(12px);pointer-events:none}
 .dot--off{background:var(--fg-3)}
