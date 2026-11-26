@@ -133,3 +133,9 @@ This repo is ready for a free Vercel project. No account was created from here.
 - Hindi and Punjabi strings are a draft for a native speaker to correct.
 - The map is a schematic drawing, not a live map of a real clinic.
 - The assistant will not give medical advice. Emergency messages tell the person to call 112, or 108 for an ambulance, and do not offer the placeholder clinic number.
+
+## Disclaimer
+
+This website is a conceptual demonstration project developed for portfolio and educational purposes. It does not represent an actual operating business, and any displayed services, products, pricing, or business information are illustrative only.
+
+Third-party assets, fonts, and libraries remain subject to their respective licenses.
